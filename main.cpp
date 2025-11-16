@@ -9,7 +9,7 @@ using namespace DSENT;
 using namespace std;
 
 const double WIDTH_MULTIPLIER = 6.0;
-const size_t DATA_WIDTH = 32;
+const size_t DATA_WIDTH = 128;
 const size_t NUM_METAL_LAYERS = 2;
 
 struct Metrics
@@ -155,6 +155,24 @@ Metrics evaluateInterconnectModel(const char* cfg_file, size_t connectedGates, b
     return Metrics{delay_val, power_val, area_val, (wireLength * model->getTechModel()->get("Wire->Global->MinSpacing").toDouble())} ;
 }
 
+void evaluateInterconnectModel_delayonly(const char* cfg_file, size_t connectedGates, bool repeatedLine, double wireLength, double widthMultiplier, ofstream& csv)
+{
+    map<String, String> config; 
+    std::cout << "******? Evaluating wireLength: " << wireLength << " meters" << std::endl;
+    Model* model = initialize(cfg_file, config, wireLength, widthMultiplier, repeatedLine, connectedGates);
+
+    double delay_val = reportDelay(config, model);
+    std::cout << "******? delay " << delay_val << std::endl;
+    csv << delay_val * 1e12 << ','
+        << wireLength << ','
+        << (repeatedLine ? "True" : "False") << ','
+        << connectedGates << '\n';
+
+    finalize(config, model);
+
+    return;
+}
+
 void writeCsvRow(std::ofstream& csv,
                  int switchType,
                  std::vector<std::string> switchTypes,
@@ -180,7 +198,7 @@ int main(int argc, char* argv[])
 
     const char* cfg_file = argv[1];
     ofstream csv("repeated_link_sweep.csv");
-    // generate csv header
+    //generate csv header
     csv << "Switch type,Switch size,WireLength(m),Area(m^2),Delay(s),Power(J)\n";
 
     // switch params
@@ -228,26 +246,27 @@ int main(int argc, char* argv[])
             }
             case 3: // Paradox
             {
-                int subSize = subSwitchSize(size);
-                Metrics sub = allMetrics[2][subSize];
+                // int subSize = subSwitchSize(size);
+                // Metrics sub = allMetrics[2][subSize];
                 lengths = getParadoxLengthVector(size);
                 for (auto len : lengths)
                     acc += evaluateInterconnectModel(cfg_file, 2, repeated, len, WIDTH_MULTIPLIER, csv);
-                acc.delay_s += sub.delay_s;
-                acc.power_j += sub.power_j;
-                acc.area_m2 += sub.area_m2;
+                // acc.delay_s += sub.delay_s;
+                // acc.power_j += sub.power_j;
+                // acc.area_m2 += sub.area_m2;
+                //TODO: add wirelength
                 break;
             }
             case 4: // HierarchicalXbar
             {
                 int subSize = subSwitchSize(size);
-                Metrics sub = allMetrics[1][subSize];
+                // Metrics sub = allMetrics[1][subSize];
                 lengths = getHierXbarLengthVector(size);
                 for (auto len : lengths)
                     acc += evaluateInterconnectModel(cfg_file, subSize, repeated, len, WIDTH_MULTIPLIER, csv);
-                acc.delay_s += sub.delay_s;
-                acc.power_j += sub.power_j;
-                acc.area_m2 += sub.area_m2;
+                // acc.delay_s += sub.delay_s;
+                // acc.power_j += sub.power_j;
+                // acc.area_m2 += sub.area_m2;
                 break;
             }
             }
@@ -261,6 +280,19 @@ int main(int argc, char* argv[])
         }
     }
 
+
+    /* std::vector<double> lengths_repeated ={122.88, 245.76, 491.52, 983.04, 1966.08, 3932.16, 7864.32, 61.44, 46.08, 107.52, 230.4, 476.16, 967.68, 1950.72, 3916.8, 30.72};
+    // std::vector<double> lengths_nonrepeated ={122.88, 245.76, 491.52, 983.04, 1966.08, 3932.16, 61.44};
+    // csv << "Delay,Length,repeated,connected gates\n";
+
+    // for (double len : lengths_repeated)
+    // {
+    //     evaluateInterconnectModel_delayonly(cfg_file, 2, true, len * 1e-6, WIDTH_MULTIPLIER, csv);
+    // }
+    // for (double len : lengths_nonrepeated)
+    // {
+    //     evaluateInterconnectModel_delayonly(cfg_file, 2, false, len * 1e-6, WIDTH_MULTIPLIER, csv);
+    // }*/
     csv.close();
     return 0;
 }

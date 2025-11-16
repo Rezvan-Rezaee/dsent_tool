@@ -153,7 +153,7 @@ namespace DSENT
 
             const double wire_pitch = tech_model->get("Wire->Global->MinSpacing").toDouble();
 
-            ms_model->setParameter("WireLength", (wireLength *  wire_pitch));
+            //ms_model->setParameter("WireLength", (wireLength *  wire_pitch));
             ms_model->setParameter("WireWidthMultiplier", widthMultiplier);
             ms_model->setParameter("Repeated", repeatedLine);
             ms_model->setParameter("NumberOfConnectedGates", connectedGates);
@@ -176,6 +176,9 @@ namespace DSENT
                 }
             }
 
+            ms_model->setProperty("WireLength", (wireLength *  wire_pitch * (ms_model->getParameter("WireWidthMultiplier").toDouble())));
+            //std::cout << "?? WireLength parameter: " << ms_model->getProperty("WireLength").toDouble() << std::endl;
+
             ms_model->update();
 
             // Evaluate the model
@@ -191,7 +194,6 @@ namespace DSENT
             if (params.count("IsReportTiming") > 0 &&
                 params.at("IsReportTiming") != "false")
             {
-                std::cout << "Reporting timing.." << std::endl;
                 reportTiming(params, ms_model);
             }
 

@@ -177,8 +177,14 @@ namespace DSENT
         // Calculate the total wire cap and total wire res
         double wire_cap_per_len = getGenProperties()->get("WireCapacitancePerLength").toDouble();
         double wire_res_per_len = getGenProperties()->get("WireResistancePerLength").toDouble();
+        std::cout << "wire length: " << wire_length << " meters" << std::endl;
+        std::cout << "connected gates: " << getParameter("NumberOfConnectedGates").toDouble() << std::endl;
+        std::cout << "Wire cap per length: " << wire_cap_per_len << " F/m" << std::endl;
+        std::cout << "Wire res per length: " << wire_res_per_len << " Ohm/m" << std::endl;
         double total_wire_cap = wire_cap_per_len * wire_length;
         double total_wire_res = wire_res_per_len * wire_length;
+        std::cout << "Total wire cap before adding gate load: " << total_wire_cap << " F" << std::endl;
+        std::cout << "Total wire res: " << total_wire_res << " Ohm" << std::endl;
 
         m_repeater_->update();
 
@@ -285,12 +291,12 @@ namespace DSENT
             {
                 // Use optimal repeater sizing/count
                 total_wire_cap += getParameter("NumberOfConnectedGates").toDouble() * Cgate;
-                std::cout << "-----& Total wire cap after adding gate load: " << total_wire_cap << std::endl;
+                std::cout << "-----& Total wire cap after adding gate load: " << total_wire_cap << ", number of connected gates: " << getParameter("NumberOfConnectedGates").toDouble() << std::endl;
 
                 const double h_opt = std::sqrt((Rgate * total_wire_cap) / (total_wire_res * Cgate));
                 const double k_opt = std::sqrt((total_wire_res * total_wire_cap) / (2.0 * Rgate * Cgate));
                 std::cout << "-----& h_opt: " << h_opt << ", k_opt: " << k_opt << std::endl;
-                number_segments = (unsigned int) std::ceil(k_opt);
+                number_segments = (unsigned int) std::ceil(k_opt) + 2;
 
                 for (int i = 0 ; i < (int)available_sizes.size(); ++i)
                 {
@@ -321,7 +327,7 @@ namespace DSENT
 
             m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
             delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
-            std::cout << "-----& Calculated delay: " << delay << std::endl;
+            std::cout << "-----& Calculated delay: " << delay * 1e12 << " ps" << std::endl;
         }
 
         // Update electrical interfaces

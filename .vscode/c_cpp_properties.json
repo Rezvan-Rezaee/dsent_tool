@@ -1,0 +1,29 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${HOME}/Programs/staging/Catch2/include/**",
+                "${env:HOME}/Programs/systemc/include",
+                "${env:HOME}/Programs/systemc/lib-linux64",
+                "${workspaceFolder}/systemc/inc",
+                "${workspaceFolder}/systemc/src",
+                "${workspaceFolder}/systemc/tb",
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "cStandard": "c11",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "linux-clang-x64",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/sources",
+                    "${workspaceFolder}/tests"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            }
+        }
+    ],
+    "version": 4
+}
