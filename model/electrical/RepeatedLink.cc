@@ -1,18 +1,18 @@
 /* Copyright (c) 2012 Massachusetts Institute of Technology
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
@@ -59,6 +59,11 @@ namespace DSENT
         addParameterName("WireLayer");
         addParameterName("WireWidthMultiplier", 1.0);
         addParameterName("WireSpacingMultiplier", 1.0);
+        addParameterName("IsPerformTimingOptimization", "TRUE");
+        addParameterName("Repeated", "TRUE");
+        addParameterName("StageEffort", 4.0);
+        addParameterName("MuxSize", "4");
+        addParameterName("NumberOfConnectedGates", "4");
         return;
     }
 
@@ -84,14 +89,14 @@ namespace DSENT
         double wire_width_multiplier = getParameter("WireWidthMultiplier").toDouble();
         double wire_spacing_multiplier = getParameter("WireSpacingMultiplier").toDouble();
 
-        ASSERT(number_bits > 0, "[Error] " + getInstanceName() + 
-                " -> Number of bits must be > 0!");
-        ASSERT(getTechModel()->isWireLayerExist(wire_layer), "[Error] " + getInstanceName() + 
-                " -> Wire layer does not exist!");
-        ASSERT(wire_width_multiplier >= 1.0, "[Error] " + getInstanceName() + 
-                " -> Wire width multiplier must be >= 1.0!");
+        ASSERT(number_bits > 0, "[Error] " + getInstanceName() +
+                                    " -> Number of bits must be > 0!");
+        ASSERT(getTechModel()->isWireLayerExist(wire_layer), "[Error] " + getInstanceName() +
+                                                                 " -> Wire layer does not exist!");
+        ASSERT(wire_width_multiplier >= 1.0, "[Error] " + getInstanceName() +
+                                                 " -> Wire width multiplier must be >= 1.0!");
         ASSERT(wire_spacing_multiplier >= 1.0, "[Error] " + getInstanceName() +
-                " -> Wire spacing multiplier must be >= 1.0!");
+                                                   " -> Wire spacing multiplier must be >= 1.0!");
 
         double wire_min_width = getTechModel()->get("Wire->" + wire_layer + "->MinWidth").toDouble();
         double wire_min_spacing = getTechModel()->get("Wire->" + wire_layer + "->MinSpacing").toDouble();
@@ -108,11 +113,11 @@ namespace DSENT
         getGenProperties()->set("WireResistancePerLength", wire_res_per_len);
 
         // Create ports
-        createInputPort("In", makeNetIndex(0, number_bits-1));
-        createOutputPort("Out", makeNetIndex(0, number_bits-1));
+        createInputPort("In", makeNetIndex(0, number_bits - 1));
+        createOutputPort("Out", makeNetIndex(0, number_bits - 1));
 
         // Create area, power, and event results
-        createElectricalAtomicResults();        
+        createElectricalAtomicResults();
         createElectricalEventAtomicResult("Send");
 
         // Create connections
@@ -153,6 +158,7 @@ namespace DSENT
     void RepeatedLink::updateModel()
     {
         unsigned int number_bits = getParameter("NumberBits").toUInt();
+        bool isPerformTimingOptimization = getParameter("IsPerformTimingOptimization").toBool();
 
         // Get properties
         double wire_length = getProperty("WireLength").toDouble();
@@ -176,7 +182,7 @@ namespace DSENT
 
         m_repeater_->update();
 
-        unsigned int increment_segments = (isKeepParity)? 2:1;
+        unsigned int increment_segments = (isKeepParity) ? 2 : 1;
         unsigned int number_segments = increment_segments;
         double delay;
         m_repeater_->setMinDrivingStrength();
@@ -187,75 +193,135 @@ namespace DSENT
         delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
 
         // If everything is 0, use number_segments min-sized repeater
-        if(wire_length != 0)
+        if (isPerformTimingOptimization) 
         {
-            // Set the initial number of segments based on isKeepParity
-            double last_min_size_delay = 0;
-            unsigned int iteration = 0;
-
-            // First set the repeater to the minimum driving strength
-            last_min_size_delay = delay;
-
-            Log::printLine(getInstanceName() + " -> Beginning Repeater Insertion");
-
-            while(required_delay < delay)
+            std::cout << "-----& This should not happen!" << std::endl;
+            if (wire_length != 0)
             {
-                Log::printLine(getInstanceName() + " -> Repeater Insertion Iteration " + (String)iteration + 
-                        ": Required delay = " + (String)required_delay + 
-                        ", Delay = " + (String)delay + 
-                        ", Slack = " + (String)(required_delay - delay) + 
-                        ", Number of repeaters = " + (String)number_segments);
+                // Set the initial number of segments based on isKeepParity
+                double last_min_size_delay = 0;
+                unsigned int iteration = 0;
 
-                // Size up if timing is not met
-                while(required_delay < delay)
+                // First set the repeater to the minimum driving strength
+                last_min_size_delay = delay;
+
+                Log::printLine(getInstanceName() + " -> Beginning Repeater Insertion");
+
+                while (required_delay < delay)
                 {
-                    if(m_repeater_->hasMaxDrivingStrength())
-                    {
-                        break;
-                    }
-                    m_repeater_->increaseDrivingStrength();
-                    m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
-                    m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
-                    delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
+                    Log::printLine(getInstanceName() + " -> Repeater Insertion Iteration " + (String)iteration +
+                                ": Required delay = " + (String)required_delay +
+                                ", Delay = " + (String)delay +
+                                ", Slack = " + (String)(required_delay - delay) +
+                                ", Number of repeaters = " + (String)number_segments);
 
-                    iteration++;
-                    Log::printLine(getInstanceName() + " -> Slack: " + (String)(required_delay - delay));
+                    // Size up if timing is not met
+                    while (required_delay < delay)
+                    {
+                        if (m_repeater_->hasMaxDrivingStrength())
+                        {
+                            break;
+                        }
+                        m_repeater_->increaseDrivingStrength();
+                        m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
+                        m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
+                        delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
+
+                        iteration++;
+                        Log::printLine(getInstanceName() + " -> Slack: " + (String)(required_delay - delay));
+                    }
+                    // Increase number of segments if timing is not met
+                    if (required_delay < delay)
+                    {
+                        number_segments += increment_segments;
+                        m_repeater_->setMinDrivingStrength();
+                        m_repeater_->getNet("Y")->setDistributedCap(total_wire_cap / number_segments);
+                        m_repeater_->getNet("Y")->setDistributedRes(total_wire_res / number_segments);
+                        m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
+                        m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
+                        delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
+
+                        // Abort if adding more min sized repeaters does not decrease the delay
+                        if (delay > last_min_size_delay)
+                        {
+                            break;
+                        }
+                        last_min_size_delay = delay;
+                    }
                 }
-                // Increase number of segments if timing is not met
-                if(required_delay < delay)
-                {
-                    number_segments += increment_segments;
-                    m_repeater_->setMinDrivingStrength();
-                    m_repeater_->getNet("Y")->setDistributedCap(total_wire_cap / number_segments);
-                    m_repeater_->getNet("Y")->setDistributedRes(total_wire_res / number_segments);
-                    m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
-                    m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
-                    delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
+                Log::printLine(getInstanceName() + " -> Repeater Insertion Ended after Iteration: " + (String)iteration +
+                            ": Required delay = " + (String)required_delay +
+                            ", Delay = " + (String)delay +
+                            ", Slack = " + (String)(required_delay - delay) +
+                            ", Number of repeaters = " + (String)number_segments);
 
-                    // Abort if adding more min sized repeaters does not decrease the delay
-                    if(delay > last_min_size_delay)
-                    {
-                        break;
-                    }
-                    last_min_size_delay = delay;
+                // Print a warning if the timing is not met
+                if (required_delay < delay)
+                {
+                    const String& warning_msg = "[Warning] " + getInstanceName() + " -> Timing not met" +
+                                                ": Required delay = " + (String)required_delay +
+                                                ", Delay = " + (String)delay +
+                                                ", Slack = " + (String)(required_delay - delay) +
+                                                ", Number of repeaters = " + (String)number_segments;
+                    Log::printLine(std::cerr, warning_msg);
                 }
             }
-            Log::printLine(getInstanceName() + " -> Repeater Insertion Ended after Iteration: " + (String)iteration + 
-                    ": Required delay = " + (String)required_delay + 
-                    ", Delay = " + (String)delay + 
-                    ", Slack = " + (String)(required_delay - delay) + 
-                    ", Number of repeaters = " + (String)number_segments);
+        }
+        else
+        {
+            //const std::vector<double>& available_sizes = getTechModel()->get("StdCell->AvailableSizes");
+            const LibUtil::String sizes_str = getTechModel()->get("StdCell->AvailableSizes");
+            const std::vector<LibUtil::String> tokens = sizes_str.split("[,]");
+            std::vector<double> available_sizes;
+            for (const auto& token : tokens)
+                available_sizes.push_back(token.toDouble());
 
-            // Print a warning if the timing is not met
-            if(required_delay < delay)
+            int chosen_size_idx = 0;
+            double Rgate = m_repeater_->getDriver("Y_Ron")->getOutputRes();
+            double Cgate = m_repeater_->getNet("A")->getTotalDownstreamCap();
+            std::cout << "-----& Calculating wire params." << std::endl;
+
+            if(getParameter("Repeated").toBool() == true)
             {
-                const String& warning_msg = "[Warning] " + getInstanceName() + " -> Timing not met" + 
-                    ": Required delay = " + (String)required_delay + 
-                    ", Delay = " + (String)delay + 
-                    ", Slack = " + (String)(required_delay - delay) +
-                    ", Number of repeaters = " + (String)number_segments;
-                Log::printLine(std::cerr, warning_msg);
+                // Use optimal repeater sizing/count
+                total_wire_cap += getParameter("NumberOfConnectedGates").toDouble() * Cgate;
+                std::cout << "-----& Total wire cap after adding gate load: " << total_wire_cap << std::endl;
+
+                const double h_opt = std::sqrt((Rgate * total_wire_cap) / (total_wire_res * Cgate));
+                const double k_opt = std::sqrt((total_wire_res * total_wire_cap) / (2.0 * Rgate * Cgate));
+                std::cout << "-----& h_opt: " << h_opt << ", k_opt: " << k_opt << std::endl;
+                number_segments = (unsigned int) std::ceil(k_opt);
+
+                for (int i = 0 ; i < (int)available_sizes.size(); ++i)
+                {
+                    double s = available_sizes[i];
+                    if (std::abs(s - h_opt) < std::abs(available_sizes[chosen_size_idx] - h_opt))
+                        chosen_size_idx = i;
+                }
+                std::cout << "-----& Chosen size index: " << chosen_size_idx << ", Size: " << available_sizes[chosen_size_idx] << std::endl;
             }
+            else
+            {
+                // Use single segment if not repeated
+                std::cout << "-----& Using single segment (not repeated)" << std::endl;
+                number_segments = 1;
+                // largest (strongest) driver
+                chosen_size_idx = (int)available_sizes.size() - 1;
+                total_wire_cap += getParameter("MuxSize").toDouble() * Cgate;
+                // tapered buffers
+                // const double FO = std::max(1.0, total_wire_cap / Cgate);
+                // const double n = std::ceil(std::log(FO) / std::log(getParameter("StageEffort").toDouble())) + 1.0; //number of tapered buffers
+            }
+
+            getGenProperties()->set("NumberSegments", number_segments);
+            m_repeater_->setDrivingStrengthIdx(chosen_size_idx);
+            m_repeater_->getNet("Y")->setDistributedCap(total_wire_cap / number_segments);
+            m_repeater_->getNet("Y")->setDistributedRes(total_wire_res / number_segments);
+            m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
+
+            m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
+            delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
+            std::cout << "-----& Calculated delay: " << delay << std::endl;
         }
 
         // Update electrical interfaces
@@ -270,6 +336,7 @@ namespace DSENT
         addElecticalAtomicResultValues(m_repeater_, number_segments * number_bits);
         double wire_area = wire_length * (wire_width + wire_spacing) * number_bits;
         addElecticalWireAtomicResultValue(wire_layer, wire_area);
+        std::cout << "-----& Wire area: " << wire_area << std::endl;
 
         return;
     }
@@ -277,7 +344,7 @@ namespace DSENT
     void RepeatedLink::useModel()
     {
         // Update the transition information for the modeled repeater
-        // Since we only modeled one repeater. So the transition information for 0->0 and 1->1 
+        // Since we only modeled one repeater. So the transition information for 0->0 and 1->1
         // is averaged out
         const TransitionInfo& trans_In = getInputPort("In")->getTransitionInfo();
         double average_static_transition = (trans_In.getNumberTransitions00() + trans_In.getNumberTransitions11()) / 2.0;
@@ -309,7 +376,7 @@ namespace DSENT
     {
         unsigned int number_segments = getGenProperties()->get("NumberSegments");
 
-        if((number_segments % 2) == 0)
+        if ((number_segments % 2) == 0)
         {
             propagatePortTransitionInfo("Out", "In");
         }
@@ -323,4 +390,3 @@ namespace DSENT
     }
 
 } // namespace DSENT
-

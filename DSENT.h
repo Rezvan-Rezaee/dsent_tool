@@ -57,7 +57,7 @@ namespace DSENT
     };
 
     Model *initialize(const char *config_file_name,
-                      std::map<String, String> &config);
+                      std::map<String, String> &config, double wireLength, double widthMultiplier, bool repeatedLine, size_t connectedGates);
 
     void finalize(std::map<String, String> &config,
                   Model *ms_model);

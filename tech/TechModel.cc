@@ -58,7 +58,6 @@ namespace DSENT
     void TechModel::readFile(const String& filename_)
     {
         // Read the main technology file
-        std::cout << "Reading technology file: " << filename_ << std::endl;
         LibUtil::readFile(filename_, params);
 
         // Search for "INCLUDE" to include more technology files

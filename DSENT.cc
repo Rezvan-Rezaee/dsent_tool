@@ -111,11 +111,11 @@ namespace DSENT
         const vector<String> &start_net_names =
             params.at("ReportTiming->StartNetNames").split("[,]");
 
-        ElectricalModel *electrical_model = (ElectricalModel *)ms_model;
+        ElectricalModel *electrical_model = static_cast<ElectricalModel *>(ms_model);
         ElectricalTimingTree timing_tree(
             electrical_model->getInstanceName(), electrical_model);
 
-        cout << "Report timing:" << endl;
+        // cout << "Report timing:" << endl;
         cout << "==============" << endl;
         for (unsigned int i = 0; i < start_net_names.size(); ++i)
         {
@@ -127,7 +127,7 @@ namespace DSENT
     }
 
     static Model *buildModel(const map<String, String> &params,
-                             TechModel *tech_model)
+                             TechModel *tech_model, double wireLength, double widthMultiplier, bool repeatedLine, size_t connectedGates)
     {
         try
         { // Create the model specified
@@ -151,6 +151,13 @@ namespace DSENT
                 }
             }
 
+            const double wire_pitch = tech_model->get("Wire->Global->MinSpacing").toDouble();
+
+            ms_model->setParameter("WireLength", (wireLength *  wire_pitch));
+            ms_model->setParameter("WireWidthMultiplier", widthMultiplier);
+            ms_model->setParameter("Repeated", repeatedLine);
+            ms_model->setParameter("NumberOfConnectedGates", connectedGates);
+
             ms_model->construct();
 
             // Update the model
@@ -168,6 +175,7 @@ namespace DSENT
                                           params.at(property_name));
                 }
             }
+
             ms_model->update();
 
             // Evaluate the model
@@ -297,7 +305,7 @@ namespace DSENT
         return tech_model;
     }
 
-    Model *initialize(const char *config_file_name, map<String, String> &config)
+    Model *initialize(const char *config_file_name, map<String, String> &config, double wireLength, double widthMultiplier, bool repeatedLine, size_t connectedGates)
     {
         try
         {
@@ -311,7 +319,7 @@ namespace DSENT
             TechModel *tech_model = constructTechModel(config);
 
             // Build the specified model in the config file
-            return buildModel(config, tech_model);
+            return buildModel(config, tech_model, wireLength, widthMultiplier, repeatedLine, connectedGates);
         }
         catch (const std::out_of_range &e)
         {
