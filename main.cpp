@@ -8,9 +8,10 @@
 using namespace DSENT;
 using namespace std;
 
-const double WIDTH_MULTIPLIER = 6.0;
-const size_t DATA_WIDTH = 128;
+const double WIDTH_MULTIPLIER = 6;
+const size_t DATA_WIDTH = 64;
 const size_t NUM_METAL_LAYERS = 2;
+const bool IS_PHOTONIC_DEFAULT = false;
 
 struct Metrics
 {
@@ -141,7 +142,7 @@ Metrics evaluateInterconnectModel(const char* cfg_file, size_t connectedGates, b
     const Result* area = static_cast<const Result* >(model->processQuery("Area", "Active"));
     const Result* power = static_cast<const Result* >(model->processQuery("NddPower", "Leakage"));
     double area_val = area ? area->calculateSum() : -1;
-    double delay_val = reportDelay(config, model);
+    double delay_val = reportDelay(config, model) * 1e12; // in ps
     double power_val = power ? power->calculateSum(): -1;
     finalize(config, model);
     std::cout << "----$ eval" << ": " << wireLength << ", "
@@ -149,7 +150,7 @@ Metrics evaluateInterconnectModel(const char* cfg_file, size_t connectedGates, b
         << "wireLength(m): " << wireLength << ", "
         << "wire pitch: " << model->getTechModel()->get("Wire->Global->MinSpacing").toDouble() << ", "
         << "connectedGates: " << connectedGates << ", "
-        << "delay(s): " << delay_val << ", "
+        << "delay(ps): " << delay_val << ", "
         << "power(J): " << power_val << ", "
         << "area(m^2): " << area_val << std::endl;
     return Metrics{delay_val, power_val, area_val, (wireLength * model->getTechModel()->get("Wire->Global->MinSpacing").toDouble())} ;
@@ -190,6 +191,8 @@ void writeCsvRow(std::ofstream& csv,
 
 int main(int argc, char* argv[])
 {
+    bool isPhotonic = IS_PHOTONIC_DEFAULT;
+    
     if (argc < 2)
     {
         cerr << "Usage: ./dsent <config_file.cfg>" << endl;
@@ -197,13 +200,29 @@ int main(int argc, char* argv[])
     }
 
     const char* cfg_file = argv[1];
+
+    if (argc == 3)
+    {
+    std::string opticEnabled = argv[2];
+    isPhotonic = (opticEnabled == "1" || opticEnabled == "true" || opticEnabled == "True"); 
+    }
+
+    if (isPhotonic)
+    {
+        map<String, String> config; 
+        Model* model = initialize(cfg_file, config, 1, 1, 1, 1, true);
+
+        finalize(config, model);
+        return 0;
+    }
+
     ofstream csv("repeated_link_sweep.csv");
     //generate csv header
-    csv << "Switch type,Switch size,WireLength(m),Area(m^2),Delay(s),Power(J)\n";
+    csv << "Switch type,Switch size,WireLength(m),Area(m^2),Delay(ps),Power(J)\n";
 
     // switch params
     std::vector<std::string> switchTypes = {"Crossbar_centeralized", "Crossbar_distributed", "Banyan", "Paradox", "HierarchicalXbar"};
-    std::vector<size_t> switchSizes = {4, 8, 16, 32, 64, 128, 256};
+    std::vector<size_t> switchSizes = {4, 8, 16, 32, 64, 128, 256, 512};
     std::vector<std::vector<Metrics>> allMetrics(switchTypes.size(), std::vector<Metrics>(switchSizes.size() + 1));
 
     for (int switchType = 0; switchType < static_cast<int>(switchTypes.size()); ++switchType)

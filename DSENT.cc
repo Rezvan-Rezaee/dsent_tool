@@ -127,7 +127,7 @@ namespace DSENT
     }
 
     static Model *buildModel(const map<String, String> &params,
-                             TechModel *tech_model, double wireLength, double widthMultiplier, bool repeatedLine, size_t connectedGates)
+                             TechModel *tech_model, double wireLength, double widthMultiplier, bool repeatedLine, size_t connectedGates, bool isPhotonic=false)
     {
         try
         { // Create the model specified
@@ -151,12 +151,14 @@ namespace DSENT
                 }
             }
 
-            const double wire_pitch = tech_model->get("Wire->Global->MinSpacing").toDouble();
+            if (!isPhotonic)
+            {
+                //ms_model->setParameter("WireLength", (wireLength *  wire_pitch));
+                ms_model->setParameter("WireWidthMultiplier", widthMultiplier);
+                ms_model->setParameter("Repeated", repeatedLine);
+                ms_model->setParameter("NumberOfConnectedGates", connectedGates);
+            }
 
-            //ms_model->setParameter("WireLength", (wireLength *  wire_pitch));
-            ms_model->setParameter("WireWidthMultiplier", widthMultiplier);
-            ms_model->setParameter("Repeated", repeatedLine);
-            ms_model->setParameter("NumberOfConnectedGates", connectedGates);
 
             ms_model->construct();
 
@@ -176,8 +178,12 @@ namespace DSENT
                 }
             }
 
-            ms_model->setProperty("WireLength", (wireLength *  wire_pitch * (ms_model->getParameter("WireWidthMultiplier").toDouble())));
-            //std::cout << "?? WireLength parameter: " << ms_model->getProperty("WireLength").toDouble() << std::endl;
+            if (!isPhotonic)
+            {
+                const double wire_pitch = tech_model->get("Wire->Global->MinSpacing").toDouble();
+                ms_model->setProperty("WireLength", (wireLength *  wire_pitch * (ms_model->getParameter("WireWidthMultiplier").toDouble())));
+                //std::cout << "?? WireLength parameter: " << ms_model->getProperty("WireLength").toDouble() << std::endl;
+            }
 
             ms_model->update();
 
@@ -307,7 +313,7 @@ namespace DSENT
         return tech_model;
     }
 
-    Model *initialize(const char *config_file_name, map<String, String> &config, double wireLength, double widthMultiplier, bool repeatedLine, size_t connectedGates)
+    Model *initialize(const char *config_file_name, map<String, String> &config, double wireLength, double widthMultiplier, bool repeatedLine, size_t connectedGates, bool isPhotonic)
     {
         try
         {
@@ -321,7 +327,7 @@ namespace DSENT
             TechModel *tech_model = constructTechModel(config);
 
             // Build the specified model in the config file
-            return buildModel(config, tech_model, wireLength, widthMultiplier, repeatedLine, connectedGates);
+            return buildModel(config, tech_model, wireLength, widthMultiplier, repeatedLine, connectedGates, isPhotonic);
         }
         catch (const std::out_of_range &e)
         {
