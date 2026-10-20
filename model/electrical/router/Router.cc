@@ -1,24 +1,3 @@
-/* Copyright (c) 2012 Massachusetts Institute of Technology
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 #include "model/electrical/router/Router.h"
 
 #include <cmath>
@@ -32,6 +11,7 @@
 #include "model/std_cells/StdCell.h"
 #include "model/electrical/router/RouterInputPort.h"
 #include "model/electrical/router/RouterSwitchAllocator.h"
+#include "model/electrical/router/OutputVCState.h"
 #include "model/timing_graph/ElectricalNet.h"
 
 namespace DSENT
@@ -62,6 +42,8 @@ namespace DSENT
         addParameterName("NumberBuffersPerVirtualChannel");
         // Spec for input port
         addParameterName("InputPort->BufferModel");
+        // Spec for per-output-VC credit state (Phase 3)
+        addParameterName("OutputVCState->Utilization", "1.0");
         // Spec for crossbar
         addParameterName("CrossbarModel");
         // Spec for switch allocator
@@ -127,6 +109,13 @@ namespace DSENT
         }
         createElectricalEventResult("ArbitrateSwitch->ArbitrateStage1");
         createElectricalEventResult("ArbitrateSwitch->ArbitrateStage2");
+        // Per-output-VC credit state (Phase 3): CreditDecrement rides on
+        // the existing switch-allocation grant event (ArbitrateStage2 is
+        // where winners are decided); CreditIncrement gets its own new
+        // top-level event, since a credit returning from downstream is not
+        // tied to any existing Router event.
+        createElectricalEventResult("ReturnCredit");
+        getEventInfo("ReturnCredit")->setTransitionInfo("CK", TransitionInfo(0.0, 1.0, 0.0));
         createElectricalEventResult("DistributeClock");
         getEventInfo("DistributeClock")->setTransitionInfo("CK", TransitionInfo(0.0, 1.0, 0.0));
 
@@ -147,6 +136,7 @@ namespace DSENT
         createCrossbar();
         createClockTree();
         createPipelineReg();
+        createOutputVCState();
 
         // Get generated numbers
         unsigned int number_crossbar_selects = getGenProperties()->get("Crossbar->NumberSelects");
@@ -187,6 +177,34 @@ namespace DSENT
         Result* arb_sw_stage2_event = getEventResult("ArbitrateSwitch->ArbitrateStage2");
         arb_sw_stage2_event->addSubResult(getSubInstance("SwitchAllocator")->getEventResult("ArbitrateStage2"), "SwitchAllocator", 1.0);
 
+        // Add per-output-VC credit state events. Per cycle only ONE output
+        // VC per port updates -- do NOT loop over every VC adding a
+        // CreditDecrement/CreditIncrement sub-result (that would overcount
+        // by total_number_vcs). Every OTHER OutputVCState's flops are still
+        // clocked every cycle regardless of which VC is active (the
+        // gated-clock design still evaluates the gate on every cycle, see
+        // OutputVCState.cc), so their Idle-event cost is real; it's
+        // included via one representative (structurally identical)
+        // instance weighted by (total_number_vcs - 1), per output port.
+        {
+            unsigned int total_number_vcs_out = getGenProperties()->get("OutputVCState->TotalNumberVirtualChannels").toUInt();
+            Result* return_credit_event = getEventResult("ReturnCredit");
+            for(unsigned int p = 0; p < number_output_ports; ++p)
+            {
+                const String& ovc0_name = "OVC" + (String)p + "_0";
+                ElectricalModel* ovc0 = (ElectricalModel*)getSubInstance(ovc0_name);
+                arb_sw_stage2_event->addSubResult(ovc0->getEventResult("CreditDecrement"), ovc0_name, 1.0);
+                return_credit_event->addSubResult(ovc0->getEventResult("CreditIncrement"), ovc0_name, 1.0);
+                if(total_number_vcs_out > 1)
+                {
+                    const String& ovc_rep_name = "OVC" + (String)p + "_1";
+                    ElectricalModel* ovc_rep = (ElectricalModel*)getSubInstance(ovc_rep_name);
+                    arb_sw_stage2_event->addSubResult(ovc_rep->getEventResult("Idle"), ovc0_name + "_idle_rep", (double)(total_number_vcs_out - 1));
+                    return_credit_event->addSubResult(ovc_rep->getEventResult("Idle"), ovc0_name + "_idle_rep", (double)(total_number_vcs_out - 1));
+                }
+            }
+        }
+
         // Add CK event
         getEventResult("DistributeClock")->addSubResult(getSubInstance("ClockTree")->getEventResult("Send"), "ClockTree", 1.0);
         return;
@@ -208,6 +226,18 @@ namespace DSENT
             getSubInstance("PipelineReg2_" + (String)i)->update();
         }
         getSubInstance("SwitchAllocator")->update();
+
+        // Update per-output-VC credit state
+        {
+            unsigned int total_number_vcs_out = getGenProperties()->get("OutputVCState->TotalNumberVirtualChannels").toUInt();
+            for(unsigned int p = 0; p < number_output_ports; ++p)
+            {
+                for(unsigned int vc = 0; vc < total_number_vcs_out; ++vc)
+                {
+                    getSubInstance("OVC" + (String)p + "_" + (String)vc)->update();
+                }
+            }
+        }
 
         // Update clock tree
         double total_clock_tree_cap = getNet("CK")->getTotalDownstreamCap();
@@ -294,6 +324,39 @@ namespace DSENT
             sw_allocator->applyTransitionInfo("Idle");
         }
         sw_allocator->use();
+
+        // Per-output-VC credit state (Phase 3): trigger OVC*_0's own named
+        // event so it applies ITS OWN Grant/CreditIn/CK EventInfo (the
+        // counter-aware, Utilization-scaled activity model, see
+        // OutputVCState.cc) -- this is what actually produces the
+        // "1 x CreditDecrement" / "1 x CreditIncrement" terms wired in
+        // constructModel(). Every other VC's representative instance
+        // (OVC*_1) is always Idle, regardless of current_event, matching
+        // the weighted addSubResult composition.
+        {
+            unsigned int total_number_vcs_out = getGenProperties()->get("OutputVCState->TotalNumberVirtualChannels").toUInt();
+            for(unsigned int p = 0; p < number_output_ports; ++p)
+            {
+                ElectricalModel* ovc0 = (ElectricalModel*)getSubInstance("OVC" + (String)p + "_0");
+                if(current_event == "ArbitrateSwitch->ArbitrateStage2")
+                {
+                    ovc0->use("CreditDecrement");
+                }
+                else if(current_event == "ReturnCredit")
+                {
+                    ovc0->use("CreditIncrement");
+                }
+                else
+                {
+                    ovc0->use("Idle");
+                }
+                if(total_number_vcs_out > 1)
+                {
+                    ElectricalModel* ovc_rep = (ElectricalModel*)getSubInstance("OVC" + (String)p + "_1");
+                    ovc_rep->use("Idle");
+                }
+            }
+        }
 
         ElectricalModel* clock_tree = (ElectricalModel*)getSubInstance("ClockTree");
         propagatePortTransitionInfo(clock_tree, "In", "CK");
@@ -523,6 +586,59 @@ namespace DSENT
             for(unsigned int i = 0; i < number_output_ports; ++i)
             {
                 portConnect(pipeline_reg2s[i], "CK", "CK");
+            }
+        }
+        return;
+    }
+
+    void Router::createOutputVCState()
+    {
+        // Get parameters
+        unsigned int number_output_ports = getParameter("NumberOutputPorts").toUInt();
+        unsigned int number_vns = getParameter("NumberVirtualNetworks").toUInt();
+        const vector<unsigned int>& number_vcs_per_vn_vector = castStringVector<unsigned int>(getParameter("NumberVirtualChannelsPerVirtualNetwork").split("[,]"));
+        const vector<unsigned int>& number_bufs_per_vc_vector = castStringVector<unsigned int>(getParameter("NumberBuffersPerVirtualChannel").split("[,]"));
+        const String& utilization = getParameter("OutputVCState->Utilization");
+
+        unsigned int total_number_vcs = 0;
+        for(unsigned int i = 0; i < number_vns; ++i)
+        {
+            total_number_vcs += number_vcs_per_vn_vector[i];
+        }
+        // Downstream slice depth per VC. Uses the same uniform,
+        // power-of-two precondition as Phase 2 (RouterInputPort) --
+        // assumed homogeneous downstream routers, not re-validated here
+        // since createRouterInputPort() (called earlier in
+        // constructModel()) already constructs a RouterInputPort with
+        // these exact parameters and would have failed its own ASSERT
+        // first if they didn't hold.
+        unsigned int slice_depth = number_bufs_per_vc_vector[0];
+
+        getGenProperties()->set("OutputVCState->TotalNumberVirtualChannels", total_number_vcs);
+
+        // One OutputVCState per (output port, VC) pair. All of them are
+        // built and clocked every cycle, so area/leakage scale correctly
+        // with port and VC count (Table 6.1's static output-side column).
+        // DSENT-ASSUMPTION: Grant/CreditIn aren't wired to any real
+        // Router-level net -- RouterSwitchAllocator's internal grant
+        // signal and the downstream credit-return signal aren't exposed as
+        // Router ports/nets, so there is nothing meaningful to portConnect
+        // them to; their activity is driven entirely by the named-event
+        // triggering in propagateTransitionInfo() below (CK is still
+        // portConnect'd for real, so its capacitance is correctly counted
+        // toward the clock tree's total load in updateModel()).
+        for(unsigned int p = 0; p < number_output_ports; ++p)
+        {
+            for(unsigned int vc = 0; vc < total_number_vcs; ++vc)
+            {
+                const String& ovc_name = "OVC" + (String)p + "_" + (String)vc;
+                ElectricalModel* ovc = (ElectricalModel*)ModelGen::createModel("OutputVCState", ovc_name, getTechModel());
+                ovc->setParameter("NumberEntries", slice_depth);
+                ovc->setParameter("Utilization", utilization);
+                ovc->construct();
+                portConnect(ovc, "CK", "CK");
+                addSubInstances(ovc, 1.0);          // weight 1 -- NOT total_number_vcs
+                addElectricalSubResults(ovc, 1.0);
             }
         }
         return;

@@ -149,6 +149,10 @@ namespace DSENT
         double M_num_trans_01 = m_trans_M_.getNumberTransitions01();
         double Q_num_trans_01 = getOutputPort("Q")->getTransitionInfo().getNumberTransitions01();
 
+        // DSENT-ASSUMPTION: the 8-state leakage weighting below treats P_D,
+        // P_CK, and P_Q as statistically independent (product of marginals).
+        // Q is physically the registered value of D, so this independence
+        // assumption is wrong whenever D and Q are correlated (the common case).
         // Calculate leakage
         double leakage = 0;
         leakage += cache->get(cell_name + "->Leakage->!D!CK!Q") * (1 - P_D) * (1 - P_CK) * (1 - P_Q);
@@ -317,6 +321,10 @@ namespace DSENT
         CellMacros::updateTristate(this, "INVZ3", drive_strength_ * 0.5);
         CellMacros::updateTristate(this, "INVZ4", drive_strength_ * 0.0625);
 
+        // DSENT-ASSUMPTION: Area->Active and Area->Metal1Wire are both set to
+        // this same computed `area` value below -- they are two independently
+        // aggregated result keys, NOT two additive area contributors. Summing
+        // Active + Metal1Wire for this cell double-counts its area.
         // Cache area result
         double area = 0.0;
         area += gate_pitch * getTotalHeight() * 1;

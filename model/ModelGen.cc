@@ -48,6 +48,9 @@
 #include "model/electrical/MatrixArbiter.h"
 #include "model/electrical/SeparableAllocator.h"
 #include "model/electrical/router/Router.h"
+#include "model/electrical/router/RouterInputPort.h"
+#include "model/electrical/router/FIFOControl.h"
+#include "model/electrical/router/OutputVCState.h"
 #include "model/electrical/RepeatedLink.h"
 #include "model/electrical/BroadcastHTree.h"
 // Optical functional units
@@ -147,9 +150,21 @@ namespace DSENT
         {
             return new DFFRAM(instance_name_, tech_model_);
         }
+        else if("RouterInputPort" == model_name_)
+        {
+            return new RouterInputPort(instance_name_, tech_model_);
+        }
         else if("MatrixArbiter" == model_name_)
         {
             return new MatrixArbiter(instance_name_, tech_model_);
+        }
+        else if("FIFOControl" == model_name_)
+        {
+            return new FIFOControl(instance_name_, tech_model_);
+        }
+        else if("OutputVCState" == model_name_)
+        {
+            return new OutputVCState(instance_name_, tech_model_);
         }
         else if("SeparableAllocator" == model_name_)
         {
@@ -317,7 +332,7 @@ namespace DSENT
         // TODO: Need more descriptions
         cout << "INV NAND2 NOR2 MUX2 XOR2 DFFQ LATQ ADDF OR2 AND2 BUF" << endl;
         cout << "RippleAdder Multiplexer OR RepeatedLink BroadcastHTree" << endl;
-        cout << "MultiplexerCrossbar Decoder DFFRAM MatrixArbiter SeparableAllocator Router" << endl;
+        cout << "MultiplexerCrossbar Decoder DFFRAM MatrixArbiter SeparableAllocator Router RouterInputPort FIFOControl OutputVCState" << endl;
         cout << "OpticalLinkBackendTx OpticalLinkBackendRx SWMRLink SWSRLink" << endl;
         cout << "LaserSource ThrottledLaserSource RingModulator RingDetector" << endl;
         cout << "ElectricalMesh ElectricalClos PhotonicClos" << endl;

@@ -1,0 +1,9 @@
+{
+    "dsent_bin": "./dsent",
+    "tech": "tech/tech_models/Bulk22LVT.model",
+    "frequency": 6e9,
+    "depths": [4, 8, 16, 32, 64, 128, 256, 512],
+    "widths": [32, 64, 128, 256],
+    "timing_opt": true,
+    "outdir": "sweep_output"
+}

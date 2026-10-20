@@ -1,0 +1,261 @@
+{
+  "1_node_sequence_walk": {
+    "config": "N=512,B=256,EnableFanout=4,RowClockFanout=4",
+    "sequence": [
+      "CK",
+      "NAND2_CKGate0",
+      "INV_CKGate0",
+      "EnBuf_0",
+      "EnBuf_1",
+      "EnBuf_2",
+      "EnBuf_3",
+      "EnBuf_4",
+      "NAND2_CKGate1_0",
+      "INV_CKGate1_0",
+      "RowBuf0_0",
+      "RowBuf0_1",
+      "RowBuf0_2",
+      "RowBuf0_3",
+      "DFF_0.CK"
+    ],
+    "n_enable_stages": 5,
+    "n_row_stages": 4,
+    "continuous_to_dff_ck": true,
+    "note": "Full 80-node internal walk (each stage's A_Cap/A_to_Y_delay/Y_Ron/Y/next-net hops) confirmed identical structure; compacted here to per-stage model names."
+  },
+  "2_enable_fanout_sweep_RowClockFanout4": {
+    "4,32": {
+      "0": 4.1017666008e-11,
+      "2": 5.0088028363e-11,
+      "3": 5.0088028363e-11,
+      "4": 4.5941549483e-11,
+      "6": 4.5941549483e-11,
+      "8": 4.5941549483e-11
+    },
+    "64,128": {
+      "0": 1.4575622948e-10,
+      "2": 1.2240646395e-10,
+      "3": 1.2299052214e-10,
+      "4": 1.2859070845e-10,
+      "6": 1.2859070845e-10,
+      "8": 1.3739863184e-10
+    },
+    "512,32": {
+      "0": 5.5746621401e-10,
+      "2": 1.2626069798e-10,
+      "3": 1.5457420847e-10,
+      "4": 1.927893696e-10,
+      "6": 2.3106671466e-10,
+      "8": 3.1257534898e-10
+    },
+    "512,256": {
+      "0": 6.5296267748e-10,
+      "2": 2.2175716146e-10,
+      "3": 2.5007067195e-10,
+      "4": 2.8828583308e-10,
+      "6": 3.2656317814e-10,
+      "8": 4.0807181245e-10
+    }
+  },
+  "3_vs_pre_phase4_unbuffered_baseline": {
+    "4,32": {
+      "before_pre_phase4_unbuffered": 7.217e-11,
+      "best_enable_fanout": 0,
+      "after": 4.1017666008e-11,
+      "ratio_before_over_after": 1.7594857782967004,
+      "faster": true
+    },
+    "512,32": {
+      "before_pre_phase4_unbuffered": 6.746e-10,
+      "best_enable_fanout": 2,
+      "after": 1.2626069798e-10,
+      "ratio_before_over_after": 5.342913596967905,
+      "faster": true
+    },
+    "512,256": {
+      "before_pre_phase4_unbuffered": 7.652e-10,
+      "best_enable_fanout": 2,
+      "after": 2.2175716146e-10,
+      "ratio_before_over_after": 3.4506213687174423,
+      "faster": true
+    }
+  },
+  "3_stop_condition_triggered": false,
+  "4_vs_broadcasthtree_replaced_at_default_fanout4": {
+    "4,32": {
+      "htree_replaced": 5.4875e-11,
+      "new_at_default_EnableFanout4": 4.5941549483e-11,
+      "delta_s": -8.933450516999996e-12,
+      "delta_pct": -16.27963647744874
+    },
+    "512,32": {
+      "htree_replaced": 6.4739e-10,
+      "new_at_default_EnableFanout4": 1.927893696e-10,
+      "delta_s": -4.5460063039999996e-10,
+      "delta_pct": -70.22052092247331
+    },
+    "512,256": {
+      "htree_replaced": 8.2883e-10,
+      "new_at_default_EnableFanout4": 2.8828583308e-10,
+      "delta_s": -5.405441669200001e-10,
+      "delta_pct": -65.21773667941557
+    }
+  },
+  "5_b_independence_check_RowClockFanout0_EnableFanout4": {
+    "t_write_clock_path_by_B": {
+      "32": 1.7801771917e-10,
+      "64": 1.9095665917e-10,
+      "128": 2.1683453917e-10,
+      "256": 2.6859029917e-10
+    },
+    "spread_pct": 50.878407173336896,
+    "array_geometry_coupling": "NONE -- SitePitch/array_area/TotalLoadCapPerBit removed entirely by this fix; the new EnBuf chain's own sizing depends only on N (via n_enable_stages) and each stage's own fixed cache lookup, never on B or array area.",
+    "root_cause_of_residual_spread": "A pre-existing, unrelated DFFRAM bug, NOT introduced by this fix and NOT array-geometry: the 'Connect DFF array' loop in constructModel() calls portConnect(dffs[i], \"CK\", row_ck_sources[i]) once per bit index (number_bits times) on the SAME single dffs[i] instance, and ElectricalModel::portConnect() adds a new addDownstreamNode edge on every call with no de-duplication -- so whatever drives row_ck_sources[i] (INV_CKGate1_i directly, at RowClockFanout=0) sees the DFF's real CK-pin capacitance counted B times in getTotalDownstreamCap(), not once. This is the same class of bug BufferCharacteristics.cc's own comment already documents for the parallel 'D' pin loop. It affects the INV_CKGate1_i -> DFF.CK segment, which is DOWNSTREAM of and untouched by this task's EnableBuf chain -- out of scope to fix here (touches the D-path fanout too, not just clock distribution), flagged rather than silently patched."
+  },
+  "6_depth_scaling_B32": {
+    "fixed_EnableFanout2": {
+      "N_values": [
+        4,
+        8,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512
+      ],
+      "t_write_clock_path": [
+        5.0088028363e-11,
+        5.6384336978e-11,
+        6.298372266e-11,
+        7.0793649601e-11,
+        7.8665760472e-11,
+        8.9124616303e-11,
+        1.0390242319e-10,
+        1.2626069798e-10
+      ],
+      "slope_s_per_log2doubling": 1.0203498930702382e-11,
+      "intercept_s": 2.365616032451189e-11,
+      "r_squared": 0.9459042592977326
+    },
+    "best_per_point_EnableFanout": {
+      "N_values": [
+        4,
+        8,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512
+      ],
+      "best_ef_per_N": {
+        "4": "0",
+        "8": "0",
+        "16": "0",
+        "32": "3",
+        "64": "2",
+        "128": "2",
+        "256": "2",
+        "512": "2"
+      },
+      "t_write_clock_path": [
+        4.1017666008e-11,
+        4.5084190008e-11,
+        5.3217238008e-11,
+        6.840575466e-11,
+        7.8665760472e-11,
+        8.9124616303e-11,
+        1.0390242319e-10,
+        1.2626069798e-10
+      ],
+      "slope_s_per_log2doubling": 1.2009220600130951e-11,
+      "intercept_s": 9.659080027904764e-12,
+      "r_squared": 0.9707754510502781
+    },
+    "note": "EnableFanout=2 chosen as the fixed-fanout curve because it is the empirically-best value at every N>=8 (see item 2); N=4's true best is EnableFanout=0 (direct connection, chain overhead not worth it at only 4 gates) -- included in the 'best_per_point' variant instead, not the fixed-EnableFanout=2 curve."
+  },
+  "7_plausibility_gate_pct_of_1ns_period": {
+    "4,32": {
+      "best_enable_fanout": 0,
+      "pct_of_1ns_period_best": 4.1017666007999996,
+      "pct_of_1ns_period_default_fanout4": 4.5941549483,
+      "flag_above_30pct": false
+    },
+    "64,128": {
+      "best_enable_fanout": 2,
+      "pct_of_1ns_period_best": 12.240646394999999,
+      "pct_of_1ns_period_default_fanout4": 12.859070844999998,
+      "flag_above_30pct": false
+    },
+    "512,32": {
+      "best_enable_fanout": 2,
+      "pct_of_1ns_period_best": 12.626069798,
+      "pct_of_1ns_period_default_fanout4": 19.27893696,
+      "flag_above_30pct": false
+    },
+    "512,256": {
+      "best_enable_fanout": 2,
+      "pct_of_1ns_period_best": 22.175716146,
+      "pct_of_1ns_period_default_fanout4": 28.828583308,
+      "flag_above_30pct": false
+    }
+  },
+  "8_area_leak_energy_vs_htree_at_default_fanout4": {
+    "4,32": {
+      "area_active_ram": 2.4803328e-10,
+      "leak_ram": 0.000221730068,
+      "e_read_mux": 4.277821304e-14,
+      "e_write": 1.087288968e-13,
+      "area_delta_vs_htree_pct": -0.3732769500318465,
+      "e_read_delta_vs_htree": 3.0399999994526746e-21,
+      "e_read_unchanged": true
+    },
+    "64,128": {
+      "area_active_ram": 1.554060288e-08,
+      "leak_ram": 0.01405242947,
+      "e_read_mux": 2.952350006e-12,
+      "e_write": 4.165770997e-12,
+      "area_delta_vs_htree_pct": -0.131912785254028,
+      "e_read_delta_vs_htree": 5.999999809593135e-21,
+      "e_read_unchanged": true
+    },
+    "512,32": {
+      "area_active_ram": 3.138524928e-08,
+      "leak_ram": 0.02834937693,
+      "e_read_mux": 5.767374955e-12,
+      "e_write": 9.010019639e-12,
+      "area_delta_vs_htree_pct": -0.5413244424923608,
+      "e_read_delta_vs_htree": -4.500000018753565e-20,
+      "e_read_unchanged": true
+    },
+    "512,256": {
+      "area_active_ram": 2.452183219e-07,
+      "leak_ram": 0.2224436082,
+      "e_read_mux": 4.613899964e-11,
+      "e_write": 6.292402522e-11,
+      "area_delta_vs_htree_pct": -0.06967626542803752,
+      "e_read_delta_vs_htree": -3.600000015002852e-19,
+      "e_read_unchanged": true
+    }
+  },
+  "8_note": "No stored BroadcastHTree baseline was given for leak_ram or e_write, so only area and e_read have deltas computed; leak_ram/e_write are reported as current absolute values only.",
+  "side_finding_not_fixed": {
+    "description": "Discovered while diagnosing item 5's residual B-dependence, NOT part of this task's scope (DFFRAM.cc's 'Connect DFF array' loop, pre-existing before this task): portConnect(dffs[i], \"CK\", row_ck_sources[i]) and portConnect(dffs[i], \"D\", \"In\", n) are both called number_bits times per row on the same single dffs[i] instance (dffs[i] represents ALL B bits via an area/power weight multiplier, addSubInstances(dffs[i], number_bits), not B separate timing-graph instances) -- portConnect adds a fresh addDownstreamNode edge every call with no de-duplication, so the real downstream fanout capacitance seen by whatever drives CK (or D) into a row is counted number_bits times, not once.",
+    "impact_on_this_fix": "None on the EnableBuf chain itself (upstream of this, N-dependent only). Affects the INV_CKGate1_i -> DFF.CK segment (with or without RowBuf), which is why item 5 shows a residual, non-array-geometry B-dependence even with the row-enable path's own contribution isolated.",
+    "not_fixed_because": "Out of this task's file/scope restriction (DFFRAM.cc's row-enable chain only) and touches the D-path fanout too, which is a separate concern from clock/enable distribution -- flagging for a future, separately-scoped task rather than silently patching it here."
+  },
+  "constraints_honored": {
+    "files_changed": [
+      "model/electrical/DFFRAM.cc",
+      "model/electrical/DFFRAM.h"
+    ],
+    "broadcasthtree_untouched": true,
+    "router_input_port_fifo_control_output_vc_state_decoder_multiplexer_std_cells_untouched": true,
+    "area_field": "Area->Active only, never summed with Metal1Wire",
+    "energy_semantics": "C*Vdd^2 per 0->1 transition, no 1/2 factor applied",
+    "output_format": "JSON",
+    "validation_methodology": "Standalone-DFFRAM (matching docs/dffram_clock_distribution_validation_results.txt and docs/clock_tree_sweep_findings.json's established approach) for item 1/2/3/5/6/7 timing; buffer_characteristics CLI (RouterInputPort->DFFRAM, matching how the given baseline numbers were generated) for item 4/8 area/leak/energy, cross-verified: standalone and CLI-path t_write_clock_path are identical to 10 significant digits at every cross-checked point.",
+    "temporary_instrumentation": "A dffram_diag subcommand was added to main.cpp for standalone-DFFRAM measurement, used to collect this report, then main.cpp was reverted via 'git checkout -- main.cpp' (confirmed clean, matches its pre-task staged state) -- only DFFRAM.cc/.h remain changed."
+  }
+}

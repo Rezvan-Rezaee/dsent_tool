@@ -1,0 +1,170 @@
+{
+  "task": "Final Task -- characterise and fix the read path, separate the taper/stage-count knobs, produce final deliverables",
+  "established_not_rederived": {
+    "clock_distribution": "Fixed in prior sessions. Write path improved 52-60%; t_write_clock_path is 3.1-9.7% of a 1ns period at every point.",
+    "read_path_status_before_this_task": "Binding at every N (was previously masked by the write path at small N). Part D ratio of 7.60x (before this task's Part B fix) was the READ path's own depth scaling, not a regression.",
+    "not_a_regression": "The original 7.44x ratio was clock-dominated and wrong. The pre-this-task 7.60x was read-dominated and correct, coincidentally close in magnitude.",
+    "enable_fanout_confound": "EnableFanout previously set both stage count and taper ratio at once, making the sweep surface non-monotonic. The 'best' EF value found earlier was a measured configuration, not an optimum -- Part C fixes this by splitting the parameter."
+  },
+
+  "part_a_read_path_characterisation": {
+    "methodology": "Standalone DFFRAM, ElectricalTimingTree::performCritPathExtract(getNet(\"RDAddr0\")) -- bit 0 (LSB) has the worst select-bit fanout (A3) and is BufferCharacteristics.cc's own t_read_addr_path measurement (max over all RDAddr bits). Measured BEFORE the Part B fix (this section characterises the defect); A1's node sequences are the pre-fix state.",
+
+    "A1_full_node_sequence": {
+      "N512_B128_before_fix": {
+        "t_read_addr_path": 3.4893718577e-10,
+        "sequence_summary": [
+          "RAM.RDAddr0 -> Mux.Sel0",
+          "Sel0Inv0.A -> A_Cap(0) -> A_to_Y_delay(8.826e-13) -> Y_Ron(1.017e-12) -> Y",
+          "Sel0Inv1.A -> A_to_Y_delay(8.826e-13) -> Y_Ron(2.336e-10) -> Y  [dominant single term]",
+          "Mux.SelBuf0 -> [8x unbuffered net-alias passthrough through nested Mux_way0.Sel0, zero delay each hop]",
+          "Mux2_i2.S0 -> S0_to_Y_delay(1.422e-11) -> Y_Ron(5.083e-13) -> Y",
+          "Mux_way0.Out -> way0Out -> Mux2_i4.A -> A_to_Y_delay(1.178e-11) -> Y_Ron(5.083e-13) -> Y  [repeats for i8,i16,i32,i64,i128,i256,i512, 9 levels total]",
+          "-> Mux.Out -> RAM.Mux_Out -> RAM.OutMult -> RAM.Out"
+        ],
+        "total_nodes": 87
+      },
+      "N4_B128_before_fix": {
+        "t_read_addr_path": 3.1110416041e-11,
+        "sequence_summary": [
+          "RAM.RDAddr0 -> Mux.Sel0 -> Sel0Inv0(A_to_Y=8.826e-13,Y_Ron=1.017e-12) -> Sel0Inv1(A_to_Y=8.826e-13,Y_Ron=1.825e-12)",
+          "-> Mux.SelBuf0 -> Mux_way0.Sel0 -> Mux2_i2.S0(S0_to_Y=1.422e-11,Y_Ron=5.083e-13) -> Mux_way0.Out -> way0Out",
+          "-> Mux2_i4.A(A_to_Y=1.178e-11,Y_Ron=0) -> Mux.Out -> RAM.Mux_Out -> RAM.Out"
+        ],
+        "total_nodes": 31
+      },
+      "note": "Full 87-node and 31-node JSON walks (every A_Cap/A_to_Y_delay/Y_Ron/net hop) were captured via a temporary diagnostic and are summarised here; the SelInv1.Y_Ron line is the single dominant term at N=512, confirming A3 directly (one lumped-RC delay proportional to the FULL accumulated fanout of every downstream MUX2 S0 pin, not distributed across the intervening hops, all of which are bare zero-R/C nets)."
+    },
+
+    "A2_delay_split_per_segment": {
+      "N512_B128": {
+        "select_distribution_delay": 2.3642e-10,
+        "select_distribution_pct": 67.76,
+        "data_path_delay": 1.1252e-10,
+        "data_path_pct": 32.24,
+        "total": 3.4894e-10,
+        "dominant_segment": "select distribution (Sel0Inv0/Sel0Inv1's own driver stage, specifically Sel0Inv1's Y_Ron RC delay against the full downstream fanout)"
+      },
+      "N4_B128": {
+        "select_distribution_delay": 4.607e-12,
+        "select_distribution_pct": 14.82,
+        "data_path_delay": 2.650e-11,
+        "data_path_pct": 85.18,
+        "total": 3.111e-11,
+        "dominant_segment": "data path (2 series MUX2 hops) -- fanout is tiny (2 leaves share bit 0 at N=4), so the untapered driver isn't yet a problem"
+      },
+      "conclusion": "Which segment dominates is N-dependent: select distribution dominates at large N (67.8% at N=512) where fanout is large; the data path dominates at small N (85.2% at N=4) where fanout is small enough that even an undersized driver's RC delay is negligible. This is exactly the fanout-driven signature the enable-path fix (Phase 4.1-4.2) already established."
+    },
+
+    "A3_select_distribution_fanout": {
+      "mechanism": "Multiplexer.cc's constructModel(), is_top_level branch (pre-fix: lines ~196-238): each select bit gets exactly 2 fixed-size INVs (Sel%dInv0/Sel%dInv1), producing a net 'SelBuf'+i. That net is then portConnect'd into BOTH mux0 and mux1's own 'Sel'+i port (line ~256-258 originally). At every recursion level BELOW the top (is_top_level==false branch, lines ~264-267 originally), the SAME bit is passed straight through via portConnect(mux0,\"Sel\"+i,\"Sel\"+i) -- a bare net alias, zero buffering, zero resistance/capacitance of its own. So one min-size INV pair, at the very top, directly drives (electrically, via the timing graph's cap-summing recursion through however many zero-R/C net hops it takes) every leaf MUX2 S0 pin that uses that bit, anywhere in the whole tree.",
+      "confirmed": true,
+      "answer": "YES -- the select distribution has the IDENTICAL untapered-fanout defect the enable/row-clock chains had before Phase 4.1-4.2: one small, never-resized driver feeding many parallel destinations with zero intermediate buffering.",
+      "fanout_by_bit_N512": {
+        "description": "countSelectBitFanout(512, bit) -- number of leaf MUX2 S0 pins driven by each LOCAL select bit (0=LSB). Derived analytically from Multiplexer.cc's own recursive inputs_0/inputs_1/selects_0/selects_1 splitting (bit `selects-1` at any level is consumed by that level's own muxf; lower bits pass to both halves).",
+        "table": {"0": 256, "1": 128, "2": 64, "3": 32, "4": 16, "5": 8, "6": 4, "7": 2, "8": 1},
+        "worst_case": "bit 0 (LSB): 256 leaf MUX2 S0 pins, all driven by one INV pair with zero intermediate buffering -- exactly this bit is what BufferCharacteristics.cc's t_read_addr_path measures as its worst case (RDAddr0)."
+      }
+    },
+
+    "A4_mux_tree_data_path_sizing": {
+      "finding": "UNIFORM (minimum) size at every level -- muxf (the MUX2 at every recursion level) is created via createStdCell(\"MUX2\",...); construct() with NO subsequent increaseDrivingStrength/setDrivingStrengthIdx call anywhere in Multiplexer.cc, at any recursion depth.",
+      "is_this_the_same_defect": false,
+      "reasoning": "Every data-path MUX2's own Y output drives exactly ONE downstream node (the next level's single muxf A or B pin -- fanout=1 throughout, confirmed by the downstream_count=1 field on every non-select node in the A1 walk). The bit-duplication case (multiple output-bit copies) is handled by ElectricalDriverMultiplier, which takes the MAX of downstream caps rather than summing, deliberately modelling independent per-bit physical drivers, not a real fanout burden. Since there is no genuine N-way fanout anywhere in the data path, uniform minimum sizing is structurally APPROPRIATE, not a defect -- there is no analogous 'stage k drives fanout k-1's worth of load' tapering opportunity when every stage's real load is a single, small, fixed next-stage input pin.",
+      "action": "NOT changed."
+    }
+  },
+
+  "part_b_fix": {
+    "decision": "APPLIED -- A3 confirmed the same defect exists in the select distribution.",
+    "file_scope_honored": ["model/electrical/Multiplexer.cc", "model/electrical/Multiplexer.h"],
+    "change_summary": "Replaced the fixed 2-INV-per-select-bit chain with a tapered BUF chain per bit (SelBuf<bit>_<stage>), stage count and per-stage sizing computed the same way as DFFRAM's EnBuf/RowBuf chains (largest available drive strength whose own input cap fits a budget shrinking by 1/SelectBufferTaper per stage, working backward from that bit's real fanout load). Fanout per bit computed analytically via countSelectBitFanout(), a pure structural recursion mirroring Multiplexer's own construction. New parameters: SelectBufferStages (0=auto, default) and SelectBufferTaper (default 4). Sizing happens in a new Multiplexer::updateModel() override (previously relied entirely on the base class default sub-instance walk), same reasoning as DFFRAM: must re-run when parameters change, needs the StdCellLib cache. The final stage's output net is still named \"SelBuf\"+i, so nothing downstream (the mux0/mux1/muxf wiring, and the recursive pass-through at every level below the top) needed to change.",
+    "post_fix_measurement": {
+      "N512_B128": {
+        "t_read_addr_path_before": 3.4893718577e-10,
+        "t_read_addr_path_after": 1.4867585915e-10,
+        "reduction_pct": 57.4,
+        "select_distribution_delay_after": 3.616e-11,
+        "select_distribution_pct_after": 24.3,
+        "stages_used_bit0": 4,
+        "data_path_delay_unchanged": 1.1252e-10
+      },
+      "N4_B128": {
+        "t_read_addr_path_before": 3.1110416041e-11,
+        "t_read_addr_path_after": 3.2837355428e-11,
+        "change_pct": 5.55,
+        "note": "Small REGRESSION at the smallest case -- fanout_count(bit=0,N=4)=2, taper=4 -> n_stages=1 (vs the old fixed 2 INV stages). A single BUF stage's own intrinsic delay for this tiny load is not quite as fast as the old fixed 2-INV chain was for this specific tiny-fanout case. Reported, not hidden -- consistent with the same kind of small-N edge-case tradeoff seen in the enable-path taper fix (EnableFanout=0 was sometimes best at the smallest N there too)."
+      }
+    }
+  },
+
+  "part_c_separated_knobs": {
+    "change": "DFFRAM.cc/.h: EnableFanout -> EnableStages (0=auto) + EnableTaper (default 4, also the auto-stage-count log-base). RowClockFanout -> RowClockStages (0=auto) + RowClockTaper (default 4). Taper<=0 disables the corresponding chain (direct connection) -- the old single-parameter's '0 disables' behaviour, moved to the taper knob since the stage-count knob's 0 now means auto. Implemented via a shared computeChainStages() helper, used identically in constructModel()/updateModel()/propagateTransitionInfo().",
+    "note_on_defaults": "Defaults (EnableStages=0, EnableTaper=4, RowClockStages=0, RowClockTaper=4) reproduce the exact same auto-formula the single combined parameter used before -- this is purely a bookkeeping split, not a re-tune. Part D's 'final settings' use these defaults, not the swept best-combination below.",
+    "independent_sweep": {
+      "method": "Coordinate search, not a full cross-product: swept EnableStages x EnableTaper at RowClock held at defaults, found the best pair, then swept RowClockStages x RowClockTaper with Enable held at that best pair.",
+      "N512_B32": {
+        "best_enable": {"stages": 2, "taper": 3, "t_write_clock_path": 7.1819028436e-11},
+        "best_row_given_best_enable": {"stages": 2, "taper": 3, "t_write_clock_path": 6.6791239554e-11},
+        "best_combination_measured": {"enable_stages": 2, "enable_taper": 3, "row_clock_stages": 2, "row_clock_taper": 3, "t_write_clock_path": 6.6791239554e-11, "area_active": 3.227786496e-08, "leak": 0.029673845457}
+      },
+      "N512_B256": {
+        "best_enable": {"stages": 2, "taper": 3, "t_write_clock_path": 8.2341221566e-11},
+        "best_row_given_best_enable": {"stages": 2, "taper": 3, "t_write_clock_path": 7.2493454615e-11},
+        "best_combination_measured": {"enable_stages": 2, "enable_taper": 3, "row_clock_stages": 2, "row_clock_taper": 3, "t_write_clock_path": 7.2493454615e-11, "area_active": 2.4898190592e-07, "leak": 0.2278462531}
+      },
+      "not_described_as_optimum": "This is a MEASURED configuration from a coordinate search over a finite grid ({0,2,3,4,5,6,7,8,9} stages x {2,3,4,6,8} taper), not a proven optimum -- consistent with the established fact that the discreteness of available drive strengths makes this sweep surface non-monotonic in general.",
+      "vs_previous_coupled_best": {
+        "N512_B32_previous_EF8": 7.7489119066e-11,
+        "N512_B32_new_best": 6.6791239554e-11,
+        "improvement_pct": 13.8,
+        "N512_B256_previous_EF8": 8.8011312196e-11,
+        "N512_B256_new_best": 7.2493454615e-11,
+        "improvement_pct": 17.6
+      },
+      "not_adopted_as_default": "Per instruction ('do not re-tune anything else'), this finding is reported only -- DFFRAM's shipped defaults remain EnableStages=0/EnableTaper=4/RowClockStages=0/RowClockTaper=4."
+    }
+  },
+
+  "part_d_final_numbers": {
+    "d1_full_sweep": "32 points (depth 4-512 x width 32-256), final (default) settings -- see sweep_output/buffer_metrics.json for the complete data (meta includes git hash, tech, frequency, all rate parameters, timestamp, and the 9-item assumptions list including this task's findings).",
+    "d2_iso_capacity": {
+      "distributions": "128x4, 16x32, 1x512 -- all B=128, 65536 total bits, frequency=1e9, timing_opt=false, final (default) settings.",
+      "methodology": "area/leakage = per-buffer value x buffer_count (every buffer instance exists in silicon simultaneously). e_read/e_write/t_critical/t_write_clock_path/t_read_path = PER-BUFFER value (a single access touches exactly one buffer).",
+      "per_distribution": {
+        "128x4": {"area_dist": 1.225487e-07, "leak_dist": 1.129702e-01, "e_read": 1.635562e-13, "e_write": 4.245611e-13, "t_critical": 4.592766e-11, "t_write_path": 4.182958e-11, "t_read_path": 4.592766e-11, "binding_term": "t_read_access (read path)"},
+        "16x32": {"area_dist": 1.289827e-07, "leak_dist": 1.191608e-01, "e_read": 1.800689e-12, "e_write": 2.585544e-12, "t_critical": 8.278986e-11, "t_write_path": 5.353144e-11, "t_read_path": 8.278986e-11, "binding_term": "t_read_access (read path)"},
+        "1x512": {"area_dist": 1.256338e-07, "leak_dist": 1.151700e-01, "e_read": 2.530809e-11, "e_write": 3.913687e-11, "t_critical": 1.486759e-10, "t_write_path": 9.387814e-11, "t_read_path": 1.486759e-10, "binding_term": "t_read_addr_path (read path)"}
+      },
+      "ratios": {
+        "area_spread_pct": 5.2502,
+        "leak_spread_pct": 5.4798,
+        "e_read_ratio": 154.7363,
+        "e_write_ratio": 92.1819,
+        "t_critical_ratio": 3.2372,
+        "t_write_path_ratio": 2.2443,
+        "t_read_path_ratio": 3.2372
+      },
+      "t_critical_ratio_history": {
+        "original_pre_all_fixes": 7.4393,
+        "after_enable_taper_fix_before_mux_fix": 7.5975,
+        "after_mux_select_buffer_fix_FINAL": 3.2372
+      }
+    },
+    "d3_does_distribution_matter": {
+      "area": "Matters a LITTLE: 5.25% spread. Mechanism: per-instance control-logic overhead (decoder+mux+clock-gating, roughly log2(N)-ish per buffer) plus the new select-buffer chains' own area (more/bigger stages needed at higher per-buffer N) -- both scale with buffer COUNT and per-buffer N respectively, in partially offsetting ways, leaving a small net spread.",
+      "leakage": "Matters a LITTLE: 5.48% spread, same mechanism as area (leakage tracks silicon footprint).",
+      "e_read": "Matters A LOT: 154.7x spread. Dominant mechanism: Mux tree depth (ceil(log2(N)) series MUX2 switching stages) PLUS select-buffer chain size (more/bigger stages for higher per-buffer N's fanout) -- both grow with per-buffer N, driving per-access read energy up sharply for the single-large-buffer end.",
+      "e_write": "Matters A LOT: 92.2x spread. Dominant mechanism: DFFRAM's Write event architecturally sums the clock-gating switching (NAND2/INV) of ALL N rows on every write, not just the addressed one (documented DSENT-ASSUMPTION, DFFRAM.cc: 'why DFF RAM doesn't scale with depth') -- this term scales directly with per-buffer N.",
+      "t_critical": "Matters SUBSTANTIALLY: 3.24x spread, now entirely due to the READ path (t_read_path_ratio=3.24x, identical to t_critical_ratio, confirming the read path is binding at every point in this comparison) -- NOT the write/clock-enable path (t_write_path_ratio is only 2.24x, and the write path is never actually the binding term at any of the three points). Mechanism: an N:1 mux tree's structural depth (ceil(log2(N)) series MUX2 delay stages plus, before this task's fix, an increasingly-undersized select driver) is a genuine property of a shared-RAM/narrow-mux-tree read architecture. Part of the old gap was an artifact (unbuffered select fanout, now fixed); what remains is real structural depth scaling, not further reducible without a different read-path architecture (e.g. a segmented/indexed read), which is out of this task's scope."
+    }
+  },
+
+  "constraints_honored": {
+    "area": "Area->Active only, never summed with Metal1Wire",
+    "energy": "C*Vdd^2 per 0->1 transition, no 1/2 factor applied",
+    "output_format": "JSON throughout",
+    "files_changed": ["model/electrical/DFFRAM.cc", "model/electrical/DFFRAM.h", "model/electrical/Multiplexer.cc", "model/electrical/Multiplexer.h", "scripts/run_buffer_sweep.py"],
+    "temporary_instrumentation": "main.cpp temporarily regained a dffram_diag subcommand (read-path walker, then extended for Part C's independent sweep) to collect these numbers, reverted via 'git checkout --' afterward (confirmed clean)."
+  }
+}

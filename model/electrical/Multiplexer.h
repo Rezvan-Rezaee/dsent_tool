@@ -46,6 +46,13 @@ namespace DSENT
         protected:
             // Build the model
             virtual void constructModel();
+            // Sizes the top-level select-bit buffer chains (see
+            // constructModel()'s own comment) against each bit's real
+            // fanout -- has to happen here, not in constructModel(), same
+            // reasoning as DFFRAM's EnBuf/RowBuf chains: it must re-run
+            // whenever parameters change, and follows the same
+            // cache-lookup idiom every other cell's own updateModel() uses.
+            virtual void updateModel();
             virtual void propagateTransitionInfo();
 
     }; // class Multiplexer

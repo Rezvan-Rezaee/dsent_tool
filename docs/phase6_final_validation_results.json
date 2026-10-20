@@ -1,0 +1,358 @@
+{
+  "final_phase": "Registration, end-to-end validation, and reproducible sweep script",
+  "part_a_registration_audit": {
+    "createModel_registry": "FIFOControl, OutputVCState, and RouterInputPort were ALL ALREADY registered in model/ModelGen.cc's createModel() (lines ~153-168) -- confirmed by grep and by a standalone smoke test that instantiated all three independently via ModelGen::createModel and confirmed an unknown name ('NotARealModel') still throws '[Error] Invalid model name'. RouterInputPort was confirmed ABSENT from the true baseline's ModelGen.cc (verified via the Initial-commit git worktree) -- it was added at some point during this multi-session effort, matching the task's own note that it 'was NOT in the original registry'.",
+    "gap_found_and_fixed": "printAvailableModels() (the --available_models CLI listing) was missing 'RouterInputPort' even though FIFOControl/OutputVCState were listed there -- fixed by adding it.",
+    "full_registry_list": "INV NAND2 NOR2 MUX2 XOR2 DFFQ LATQ ADDF OR2 AND2 BUF, RippleAdder Multiplexer OR RepeatedLink BroadcastHTree, MultiplexerCrossbar Decoder DFFRAM MatrixArbiter SeparableAllocator Router RouterInputPort FIFOControl OutputVCState, OpticalLinkBackendTx OpticalLinkBackendRx SWMRLink SWSRLink, LaserSource ThrottledLaserSource RingModulator RingDetector, ElectricalMesh ElectricalClos PhotonicClos (TestModel also exists in createModel() but was already absent from printAvailableModels() before this session -- left as-is, out of this task's stated scope)."
+  },
+  "part_b_correctness_against_becker_table_6_1": {
+    "formula": "Input: VC pointers=2*V*ceil(log2(B/V)), Flags=V. Output: Busy/empty=2*V, VC counters=V*ceil(log2(B/V)).",
+    "verification_method": "Register counts are read from the ACTUAL constructed object graph via Model::hasSubInstance() existence checks (WRIdx_DFF/RDIdx_DFF/Flag_DFF for the input side, Cnt_DFF/Busy_DFF/Empty_DFF for a standalone OutputVCState instance on the output side), not re-derived from the same formula used to predict them.",
+    "b_equals_16_sweep": {
+      "2": {
+        "idx_bits": 3,
+        "cnt_bits": 4,
+        "model_total_ctrl_regs": 26,
+        "becker_total_ctrl_regs": 24,
+        "storage_registers": 1024,
+        "model_pct_of_storage": 2.5391,
+        "becker_pct_of_storage": 2.3438,
+        "input_matches_becker": true,
+        "output_matches_becker": false
+      },
+      "4": {
+        "idx_bits": 2,
+        "cnt_bits": 3,
+        "model_total_ctrl_regs": 40,
+        "becker_total_ctrl_regs": 36,
+        "storage_registers": 1024,
+        "model_pct_of_storage": 3.9062,
+        "becker_pct_of_storage": 3.5156,
+        "input_matches_becker": true,
+        "output_matches_becker": false
+      },
+      "8": {
+        "idx_bits": 1,
+        "cnt_bits": 2,
+        "model_total_ctrl_regs": 56,
+        "becker_total_ctrl_regs": 48,
+        "storage_registers": 1024,
+        "model_pct_of_storage": 5.4688,
+        "becker_pct_of_storage": 4.6875,
+        "input_matches_becker": true,
+        "output_matches_becker": false
+      },
+      "16": {
+        "construction_failed": true,
+        "error": "FIFOControl.cc:143 ASSERT -- NumberEntries must be >= 2 (slice_depth = B/V = 16/16 = 1)",
+        "becker_expected_total_ctrl_regs": 48,
+        "becker_expected_pct_of_storage": 4.6875,
+        "note": "Becker's formula is well-defined at V=16 (idx_bits=ceil(log2(1))=0), but FIFOControl's own NumberEntries>=2 ASSERT (a pre-existing Phase 1 structural limitation, unrelated to this phase) prevents RouterInputPort from constructing this configuration at all. Not fixed, per instructions."
+      }
+    },
+    "figure_6_1_reproduction": "B=16, 64-bit flits -> 1024 storage registers (confirmed: storage_registers=1024 for V=2/4/8). Expected control-register %% of storage: 2.3%%, 3.5%%, 4.7%%, 4.7%% for V=2,4,8,16 -- these are Becker's OWN formula values, not the model's.",
+    "finding": "The model does NOT reproduce Table 6.1 exactly at any of the 4 points. Input side (FIFOControl) matches Becker's formula EXACTLY at every V -- no deviation. Output side (OutputVCState) EXCEEDS Becker's formula by precisely num_vcs registers at every V (26 vs 24 at V=2, 40 vs 36 at V=4, 56 vs 48 at V=8) -- this is a single, well-understood, ALREADY DOCUMENTED design choice (OutputVCState.cc's own comment: the counter is ceil(log2(N))+1 bits, one bit beyond Becker's raw formula, to represent the full downstream depth without wrapping), not a bug -- reported per instructions, not silently fixed. Resulting model percentages (2.54%%, 3.91%%, 5.47%%) all exceed Becker's own reference percentages (2.34%%, 3.52%%, 4.69%%) by more than one register in every case -- flagged as instructed. V=16 (B/V=1) CANNOT be constructed by the model at all: FIFOControl.cc's own NumberEntries>=2 ASSERT (a pre-existing Phase 1 structural limitation, unrelated to this phase) rejects a 1-entry-deep FIFO, even though Becker's formula is well-defined there (idx_bits=0, same 48-register total as V=8). Not fixed, per 'this phase adds no new modelling' -- reported as a hard construction failure.",
+    "post_report_fix": {
+      "change": "OutputVCState.cc constructModel(): cnt_bits changed from ceil(log2(NumberEntries))+1 to ceil(log2(NumberEntries)) (the +1 dropped), on explicit instruction after this report was first written. Reasoning given: Busy_DFF/Empty_DFF already carry the two boundary states (all-consumed / all-available), matching Table 6.1's own separate 'busy/empty = 2*V' line, so the counter itself only needs to distinguish the interior states.",
+      "reverified_b_equals_16": {
+        "V=2": {
+          "model_total": 24,
+          "becker_total": 24,
+          "model_pct": 2.3438,
+          "becker_pct": 2.3438,
+          "match": true
+        },
+        "V=4": {
+          "model_total": 36,
+          "becker_total": 36,
+          "model_pct": 3.5156,
+          "becker_pct": 3.5156,
+          "match": true
+        },
+        "V=8": {
+          "model_total": 48,
+          "becker_total": 48,
+          "model_pct": 4.6875,
+          "becker_pct": 4.6875,
+          "match": true
+        }
+      },
+      "result": "Both input and output sides now match Becker Table 6.1 EXACTLY at V=2,4,8 (previously only the input side matched). Percentages now match the task's stated 2.3%/3.5%/4.7% targets exactly (V=16 still cannot be constructed at all, unchanged -- see the pre-existing FIFOControl NumberEntries>=2 finding above).",
+      "new_edge_case_found": "NumberEntries=1 (a 1-entry-deep VC slice) now gives cnt_bits=0, which fails construction outright: ZeroDetect_OR is built with NumberInputs=0 and OR.cc throws '[Error] ZeroDetect_OR -> Number of inputs must be > 0!'. This is NEW: with the +1, cnt_bits was always >=1 regardless of NumberEntries, so this path never hit a zero-width gate. Verified directly on a standalone OutputVCState instance (NumberEntries=1 throws; NumberEntries=2,3,4 all construct fine, cnt_bits=1,2,2 respectively). Does not affect the standard 8x4 sweep (minimum depth=4, num_vcs=1 there), and RouterInputPort already can't reach a 1-entry OutputVCState via the B=16,V=16 path since FIFOControl's own NumberEntries>=2 ASSERT blocks it first -- but a standalone OutputVCState with NumberEntries=1 (e.g. a real Router config with an output VC slice depth of 1) would now hit this. Reported, not silently patched -- an explicit ASSERT NumberEntries>=2 (mirroring FIFOControl's own bound) is the most likely fix if this configuration needs to be supported, but that's a separate design decision left to the author.",
+      "scripts/run_buffer_sweep.py updated": "becker_table_6_1_output_side is now gated into sweep_valid (previously reported-only, since a mismatch was expected/documented). Re-run at the same Part C sweep parameters: input_matches_becker=True, output_matches_becker=True across all 32 (depth,width) points at num_vcs=1 (sweep_valid is still False overall, unchanged, due to the pre-existing 14/32 timing failures at 6GHz and the e_write_linear_in_depth regression -- unrelated to this fix)."
+    }
+  },
+  "part_c_regression_ledger": {
+    "methodology": [
+      "No per-phase git commits exist in this repo (Phases 1-5 were all uncommitted working-tree edits on top of a 5-commit history unrelated to the router work). Only 3 real checkpoints were reconstructable: (1) 'baseline' = git commit d3f85b5 'Initial commit', the true pristine pre-Phase-0 DSENT router model; (2) 'Phase 0' = git commit 07ea076, an auto-checkpoint ('WIP: Claude Code rate-limit checkpoint') that captures RouterInputPort.cc's bug fixes (Result-weight bug: number_addr_bits used as a per-instance weight instead of a loop bound -- exactly the CONSTRAINTS warning about this -- plus missing EventInfo registration for WriteBuffer/ReadBuffer) with FIFOControl.cc/OutputVCState.cc confirmed NOT YET present, and DFFRAM.cc changed by comments only (no Phase 4 clock-tree content yet); (3) 'Phase 4' = current working tree with this session's own Phase 5 diff to RouterInputPort.cc/.h precisely reverted (reconstructed by reverse-editing, verified byte-identical after restoring). Phases 2 (per-VC FIFOControl), 3 (OutputVCState), and 4 (DFFRAM clock tree) were never separately committed and cannot be individually isolated -- the 'Phase 0 -> Phase 4' row below is their COMBINED delta, not decomposable further. This limitation is reported rather than papered over, per the task's own instructions.",
+      "All sweeps: frequency=6e9 Hz, num_vns=1, vcs_per_vn=1, tech=Bulk22LVT.model, depths=[4,8,16,32,64,128,256,512] x widths=[32,64,128,256] (32 configs), matching scripts/sweep_config.json's historical convention."
+    ],
+    "baseline_to_phase0": {
+      "expectation": "tiny, read-pointer term only",
+      "stats": {
+        "area_total": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": -1.4994,
+          "max_pct": -0.0336,
+          "mean_pct": -0.4506
+        },
+        "leak_total": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": -1.5905,
+          "max_pct": -0.0349,
+          "mean_pct": -0.4765
+        },
+        "e_write": {
+          "n": 0,
+          "skipped": 32,
+          "min_pct": null,
+          "max_pct": null,
+          "mean_pct": null
+        },
+        "e_read": {
+          "n": 0,
+          "skipped": 32,
+          "min_pct": null,
+          "max_pct": null,
+          "mean_pct": null
+        },
+        "t_critical": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": 0.0,
+          "max_pct": 0.0,
+          "mean_pct": 0.0
+        }
+      },
+      "finding": "area/leak: CORRECT sign, small (mean -0.45%/-0.48%, max -1.5%/-1.6%) -- matches 'tiny' exactly, and the DECREASE is expected: baseline's addSubInstances(rd_addr_dffs[i], number_addr_bits) bug over-weighted the read-pointer register bank by number_addr_bits instead of 1.0; Phase 0 fixes exactly that term. t_critical: 0% (unaffected, correct -- a Result-aggregation weight bug doesn't touch the real electrical/timing graph). e_write/e_read: UNMEASURABLE at baseline for all 32/32 configs -- baseline's RouterInputPort::constructModel() registers WriteBuffer/ReadBuffer via raw addEventResult(new Result(...)) without matching EventInfo (createElectricalEventResult() doesn't exist yet), so ANY energy query on those events throws 'Event (...) does not exist in the event info map'. This was caught (not silently papered over) via a measurement-harness try/catch scoped to the baseline-only tooling; the RouterInputPort model itself was never touched. 27/32 configs hit this crash; the other 5 already fail timing at baseline and skip the energy query for that separate reason. This IS the bug Phase 0 fixes -- it's why energy becomes measurable at all from Phase 0 onward."
+    },
+    "phase0_to_phase4_combined": {
+      "expectation": "area/leakage up a few percent (combines Phase 2 per-VC control, Phase 3 output VC state, and Phase 4 clock tree -- not individually separable)",
+      "stats": {
+        "area_total": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": -7.7501,
+          "max_pct": 26.1251,
+          "mean_pct": 4.7151
+        },
+        "leak_total": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": -8.7598,
+          "max_pct": 30.0483,
+          "mean_pct": 5.1786
+        },
+        "e_write": {
+          "n": 18,
+          "skipped": 14,
+          "min_pct": 14.9012,
+          "max_pct": 116.6816,
+          "mean_pct": 43.1263
+        },
+        "e_read": {
+          "n": 18,
+          "skipped": 14,
+          "min_pct": -8.4992,
+          "max_pct": 2.1497,
+          "mean_pct": -2.1372
+        },
+        "t_critical": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": -60.6846,
+          "max_pct": 25.1085,
+          "mean_pct": 0.2605
+        }
+      },
+      "wrong_sign_findings": [
+        {
+          "depth": 256,
+          "width": 256,
+          "area_pct": -0.711,
+          "t_critical_phase0": 1.659634266e-10,
+          "t_critical_phase4": 1.663047225e-10
+        },
+        {
+          "depth": 512,
+          "width": 32,
+          "area_pct": -7.143,
+          "t_critical_phase0": 1.634041036e-10,
+          "t_critical_phase4": 1.663047225e-10
+        },
+        {
+          "depth": 512,
+          "width": 64,
+          "area_pct": -6.958,
+          "t_critical_phase0": 1.638669726e-10,
+          "t_critical_phase4": 1.663047225e-10
+        },
+        {
+          "depth": 512,
+          "width": 128,
+          "area_pct": -7.75,
+          "t_critical_phase0": 1.656769631e-10,
+          "t_critical_phase4": 1.663047225e-10
+        },
+        {
+          "depth": 512,
+          "width": 256,
+          "area_pct": -5.919,
+          "t_critical_phase0": 1.635531129e-10,
+          "t_critical_phase4": 1.663047225e-10
+        }
+      ],
+      "finding": "area/leak: mean +4.7%/+5.2%, matching 'up a few percent' for 27/32 configs, but 5 configs (depth=512 at all 4 widths, plus depth=256/width=256) show a DECREASE of 0.7%-8.8% -- reported prominently as instructed, not silently corrected. Explanation found in the data: at Phase 0, t_critical for these 5 configs sits at 1.634e-10 to 1.660e-10 s (varying by config); at Phase 4 it is a FLAT 1.663047225e-10 s across all 5 -- consistent with Phase 4's BroadcastHTree clock distribution hitting a structural ceiling that differs from Phase 0's single-gate clock fanout, changing how the timing optimizer sizes drivers for very large fanout (this is exactly the 'delay/power blowup' Phase 4 was built to address, per its own validation notes) -- plausible but not proven without deeper driver-sizing inspection; reported as observed, not asserted as certain. e_write: +14.9% to +116.7% (all correct sign, matches added per-VC control + activity modeling). e_read: mostly -8.5% to +2.1% (net negative, small). t_critical: -60.7% to +25.1% -- the large negative outliers are consistent with Phase 4 fixing severe timing violations at large depth, matching its own stated motivation."
+    },
+    "phase4_to_phase5": {
+      "expectation": "area/leakage unchanged, energy changes only",
+      "stats": {
+        "area_total": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": 0.0,
+          "max_pct": 0.0,
+          "mean_pct": 0.0
+        },
+        "leak_total": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": 0.0,
+          "max_pct": 0.0,
+          "mean_pct": 0.0
+        },
+        "e_write": {
+          "n": 18,
+          "skipped": 14,
+          "min_pct": -21.8208,
+          "max_pct": -1.6547,
+          "mean_pct": -10.6458
+        },
+        "e_read": {
+          "n": 18,
+          "skipped": 14,
+          "min_pct": 0.0,
+          "max_pct": 0.0,
+          "mean_pct": 0.0
+        },
+        "t_critical": {
+          "n": 32,
+          "skipped": 0,
+          "min_pct": 0.0,
+          "max_pct": 0.0,
+          "mean_pct": 0.0
+        }
+      },
+      "finding": "area/leak/t_critical: EXACTLY 0.0% for all 32 configs -- bit-identical, matches expectation perfectly (structure never changes in Phase 5). e_write: -1.65% to -21.8% (mean -10.6%), all same sign, consistent with the WE-transition-formula change documented in Phase 5's own validation report. e_read: exactly 0.0% for all comparable configs (ReadRate defaults to 1.0, numerically reproducing the old hardcoded formula). No wrong-signed deltas."
+    }
+  },
+  "part_d_iso_capacity_headline_comparison": {
+    "distributions": "128 buffers x 4 entries, 16 buffers x 32 entries, 1 buffer x 512 entries -- all B=128, 65536 total bits, frequency=1e9 Hz",
+    "task_stated_baseline_reference": {
+      "area_spread_pct": 0.9,
+      "e_read_ratio": 121.5,
+      "t_critical_ratio": 8.9
+    },
+    "measured_true_baseline_initial_commit": {
+      "per_distribution": {
+        "128": {
+          "area": 1.226837146e-07,
+          "e_read": null,
+          "e_write": null,
+          "t_critical": 5.815113836e-10
+        },
+        "16": {
+          "area": 1.226837146e-07,
+          "e_read": null,
+          "e_write": null,
+          "t_critical": 5.815113836e-10
+        },
+        "1": {
+          "area": 1.226837146e-07,
+          "e_read": null,
+          "e_write": null,
+          "t_critical": 5.815113836e-10
+        }
+      },
+      "area_spread_pct": 0.0,
+      "e_read_ratio_max_over_min": null,
+      "e_write_ratio_max_over_min": null,
+      "t_critical_ratio_max_over_min": 1.0
+    },
+    "measured_phase4_before_this_phase": {
+      "per_distribution": {
+        "128": {
+          "area": 1.247544038e-07,
+          "e_read": 2.042087593e-11,
+          "e_write": 3.36131979e-11,
+          "t_critical": 3.489371858e-10
+        },
+        "16": {
+          "area": 1.237136102e-07,
+          "e_read": 2.286177974e-11,
+          "e_write": 3.321466617e-11,
+          "t_critical": 3.489371858e-10
+        },
+        "1": {
+          "area": 1.23321792e-07,
+          "e_read": 2.30925854e-11,
+          "e_write": 3.308969597e-11,
+          "t_critical": 3.489371858e-10
+        }
+      },
+      "area_spread_pct": 1.1617,
+      "e_read_ratio_max_over_min": 1.1308,
+      "e_write_ratio_max_over_min": 1.0158,
+      "t_critical_ratio_max_over_min": 1.0
+    },
+    "measured_phase5_after_this_phase": {
+      "per_distribution": {
+        "128": {
+          "area": 1.247544038e-07,
+          "e_read": 2.042087593e-11,
+          "e_write": 3.351123333e-11,
+          "t_critical": 3.489371858e-10
+        },
+        "16": {
+          "area": 1.237136102e-07,
+          "e_read": 2.286177974e-11,
+          "e_write": 3.31039674e-11,
+          "t_critical": 3.489371858e-10
+        },
+        "1": {
+          "area": 1.23321792e-07,
+          "e_read": 2.30925854e-11,
+          "e_write": 3.297782745e-11,
+          "t_critical": 3.489371858e-10
+        }
+      },
+      "area_spread_pct": 1.1617,
+      "e_read_ratio_max_over_min": 1.1308,
+      "e_write_ratio_max_over_min": 1.0162,
+      "t_critical_ratio_max_over_min": 1.0
+    },
+    "finding": "COULD NOT REPRODUCE the task-stated baseline reference (area spread 0.9%, e_read ratio 121.5x, t_critical ratio 8.9x) from either checkpoint actually available in this repo. At the true original baseline (Initial commit, no per-VC modeling of any kind), all three distributions build an IDENTICAL flat shared RAM (same total_entries=512 regardless of how many VCs it's nominally divided into) -- area/leak/t_critical are 100%-identical across all three (0% spread, 1.0x ratio), and energy is unmeasurable there (same baseline bug as Part C). At Phase 4 (per-VC FIFOControl already present, the state immediately before this final phase), the measured spread is much smaller than claimed: area spread 1.16% (roughly the right order of magnitude vs the claimed 0.9%), but e_read ratio only 1.13x (not 121.5x) and t_critical ratio exactly 1.0x (not 8.9x) -- both because DSENT's actual architecture uses ONE SHARED RAM across all VCs (Becker Sec 6.3's stated choice, explicitly documented in RouterInputPort.cc), so read-mux-tree depth and timing depend only on TOTAL entries (identical across all 3 iso-capacity distributions by construction), not on per-VC depth. A 121.5x/8.9x spread would require per-VC SEPARATE RAM arrays (each with its own, very different, mux-tree depth) -- a different architecture than what this codebase actually implements. This discrepancy is reported as instructed, not silently reconciled by fabricating a match.",
+    "headline_answer": "Phase 5 changes NOTHING about this comparison for area, e_read, or t_critical (all three identical between Phase 4 and Phase 5 measurements above, matching the 'energy changes only, structure unchanged' design). e_write shifts down slightly and uniformly (~-0.3% to -0.34% across all three distributions, from the WriteRate=1.0 WE-formula change), preserving almost exactly the same shape (e_write ratio 1.0158x before -> 1.0162x after -- a negligible widening). The gap between distributions NEITHER narrowed NOR widened NOR reversed for any of the 5 metrics under this phase -- Phase 5 is, correctly, activity-only and does not touch the structural story the iso-capacity comparison is about."
+  },
+  "part_e_sweep_script": {
+    "path": "scripts/run_buffer_sweep.py",
+    "replaces": "scripts/run_dsent_sweep.py (removed)",
+    "verification": "Run at frequency=6e9, depths=[4,8,16,32,64,128,256,512], widths=[32,64,128,256], num_vcs=[1], write_rate=1.0, read_rate=1.0, flit_toggle_rate=0.5 -- exactly Part C's Phase 5 sweep parameters. Spot-checked e_write at (depth=4,width=32) against the manually-run Part C data: matched to full double precision (1.129326306e-13 J both ways). 18/32 points succeed (14 fail timing at 6GHz, matching Part C's own 14-skip count for e_write/e_read exactly). Exit code 1 (sweep_valid=False), correctly reflecting the real 14/32 timing failures and the output-side Becker mismatch -- not silently forced to pass.",
+    "cli_args": "--dsent-bin --tech --frequency --depths --widths --num-vcs --write-rate --read-rate --flit-toggle-rate --timing-opt --outdir",
+    "outputs": "buffer_metrics.json, run_log.txt -- both JSON/text, dsent's own --out is always routed through a deleted tempfile, no CSV ever touches disk.",
+    "automatic_part_b_checks": "becker_table_6_1_checks[] runs for every (depth,width,num_vcs) point; input-side match is gated into sweep_valid, output-side mismatch is reported but NOT gated (documented, expected deviation, not a defect)."
+  },
+  "part_f_assumptions": "Embedded verbatim (7 items) in scripts/run_buffer_sweep.py's ASSUMPTIONS list and written into every run's meta.assumptions field.",
+  "part_g_yosys_external_check": {
+    "status": "SKIPPED CLEANLY",
+    "reason": "`which yosys` found nothing on this system -- no Yosys install available. Per instructions, skipped without blocking the rest of the task."
+  },
+  "constraints_honored": {
+    "area": "Area->Active only, never summed with Metal1Wire",
+    "energy": "C*Vdd^2 per 0->1 transition, no 1/2 factor applied",
+    "weights": "addSubInstances/addSubResult weight arguments are per-instance multiplicity (1.0, or (total_number_vcs-1) for the FIFO idle-representative), never a loop bound -- this is EXACTLY the bug Part C's baseline->Phase0 finding identifies and confirms fixed",
+    "output_format": "JSON throughout, no CSV produced or left on disk anywhere in this phase"
+  }
+}

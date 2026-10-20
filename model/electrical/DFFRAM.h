@@ -45,6 +45,12 @@ namespace DSENT
         protected:
             // Build the model
             virtual void constructModel();
+            // Overrides the base class's default sub-instance walk so every
+            // sub-instance is updated explicitly. Also sizes the EnBuf and
+            // RowBuf chains (Phase 4.2) against their real downstream load
+            // -- see updateModel()'s own comment for why this has to happen
+            // here rather than at construct() time.
+            virtual void updateModel();
             virtual void propagateTransitionInfo();
 
     }; // class DFFRAM

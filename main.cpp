@@ -1,14 +1,16 @@
 #include "DSENT.h"
+#include "BufferCharacteristics.h"
 #include "model/Model.h"
 #include <iostream>
 #include <fstream>
 #include <map>
 #include <vector>
+#include <cmath>
 
 using namespace DSENT;
 using namespace std;
 
-const double WIDTH_MULTIPLIER = 6;
+const double WIDTH_MULTIPLIER = 6; 
 const size_t DATA_WIDTH = 64;
 const size_t NUM_METAL_LAYERS = 2;
 const bool IS_PHOTONIC_DEFAULT = false;
@@ -99,7 +101,9 @@ std::vector<double> getXbarLengthVector(size_t switchSize)
 std::vector<double> getParadoxLengthVector(size_t switchSize)
 {
     std::vector<double> lengthVector;
-    double L = wireLength(switchSize/2, WIDTH_MULTIPLIER);
+    //double subSwitchSize = std::sqrt(switchSize);
+    double longestPath = switchSize/2; // - 2 * subSwitchSize
+    double L = wireLength(longestPath, WIDTH_MULTIPLIER);
     lengthVector.push_back(L);
 
     return lengthVector;
@@ -191,8 +195,13 @@ void writeCsvRow(std::ofstream& csv,
 
 int main(int argc, char* argv[])
 {
+    if ((argc >= 2) && (String(argv[1]) == "buffer_characteristics"))
+    {
+        return BufferCharacteristics::run(argc, argv);
+    }
+
     bool isPhotonic = IS_PHOTONIC_DEFAULT;
-    
+
     if (argc < 2)
     {
         cerr << "Usage: ./dsent <config_file.cfg>" << endl;
@@ -216,13 +225,13 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    ofstream csv("repeated_link_sweep.csv");
+    ofstream csv("repeated_link_2.csv");
     //generate csv header
     csv << "Switch type,Switch size,WireLength(m),Area(m^2),Delay(ps),Power(J)\n";
 
     // switch params
     std::vector<std::string> switchTypes = {"Crossbar_centeralized", "Crossbar_distributed", "Banyan", "Paradox", "HierarchicalXbar"};
-    std::vector<size_t> switchSizes = {4, 8, 16, 32, 64, 128, 256, 512};
+    std::vector<size_t> switchSizes = {4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
     std::vector<std::vector<Metrics>> allMetrics(switchTypes.size(), std::vector<Metrics>(switchSizes.size() + 1));
 
     for (int switchType = 0; switchType < static_cast<int>(switchTypes.size()); ++switchType)

@@ -1,0 +1,149 @@
+{
+  "task": "Closure Task -- stack depth guard, local interconnect underestimate, full re-sweep + phase ledger, iso-capacity headline",
+  "constraints_honored": {
+    "area": "Area->Active only, never summed with Metal1Wire",
+    "output_format": "JSON throughout, no CSV produced anywhere",
+    "no_new_modelling": "Parts A/B are read/measure/report only -- no wire model added, no recursion rewrite performed (margin check passed). Part C/D use only the existing, already-shipped DFFRAM.cc/.h (EnableBuf chain) and RouterInputPort.cc (P5 activity params, VC-select fix) -- nothing new was modelled to produce them.",
+    "temporary_instrumentation": "extractCritPathDelay() in model/timing_graph/ElectricalTimingTree.cc/.h was temporarily instrumented with depth/node counters, and main.cpp temporarily gained dffram_diag/router_diag/wire_diag subcommands, all used to collect Part A/B/C/D's numbers, then reverted via 'git checkout --' (confirmed clean against the pre-task tracked state). DFFRAM.cc/.h were also temporarily reverted to their pre-Phase-4.1 (BroadcastHTree/EnableTree) content to measure the P4->P4' phase delta in isolation, then restored from a backup and rebuilt (confirmed byte-identical to the shipped fix via grep/build)."
+  },
+
+  "part_a_stack_depth_guard": {
+    "risk": "ElectricalTimingTree.cc:131-136's own TODO warns of stack overflow on recursive crit-path extraction 'with long chains of logic (4000+ nodes)'.",
+    "method": "extractCritPathDelay() instrumented with a global current-depth counter (incremented on entry, decremented on every return path, tracking the max seen) and a total-nodes-visited counter. Measured via performCritPathExtract(getNet(\"CK\")) on a standalone DFFRAM at the 4 canonical points, and on a full Router (P=5 in/out ports, V=4 VCs, 1 VN, 32-entry buffers/VC, 64-bit flits, DFFRAM buffer model, BroadcastHTree router-level clock tree per configs/router.cfg's own convention) from its own \"CK\" net.",
+    "results": [
+      {"config": "DFFRAM (4,32)", "max_recursion_depth": 51, "nodes_visited": 281},
+      {"config": "DFFRAM (64,128)", "max_recursion_depth": 69, "nodes_visited": 10721},
+      {"config": "DFFRAM (512,32)", "max_recursion_depth": 75, "nodes_visited": 33325},
+      {"config": "DFFRAM (512,256)", "max_recursion_depth": 81, "nodes_visited": 151085},
+      {"config": "Router P=5,V=4,buf_depth=32,flit=64", "max_recursion_depth": 164, "nodes_visited": 47184}
+    ],
+    "interpretation": "Recursion DEPTH (what actually consumes C++ call-stack frames in a depth-first walk -- siblings pop off the stack before the next sibling is explored, so stack usage tracks the longest single root-to-leaf path, not total graph size) stays in the tens to low hundreds across every configuration measured, including the largest DFFRAM point and a full multi-VC Router. Total NODES VISITED grows into the hundreds of thousands at large N (driven by the N-way row fanout each getting its own DFS sub-call), but that drives wall-clock time, not stack depth -- it is a separate quantity from the TODO's actual stack-overflow concern.",
+    "margin_against_4000": "Worst measured depth is 164 (Router, P=5/V=4) -> margin = 4000/164 = 24.4x. Worst DFFRAM-only point is 81 (512,256) -> margin = 49.4x. Both comfortably above the 2x threshold.",
+    "stack_rewrite_performed": false,
+    "reasoning": "The TODO's own '4000+ nodes' framing describes a hypothetical single long SERIAL chain (where depth == node count); DSENT's actual graphs (DFFRAM, Router) are branching/fanning structures where depth stays governed by the longest single gate-to-gate chain (roughly: CKGate0 -> INV_CKGate0 -> EnBuf stages -> CKGate1 -> INV_CKGate1 -> RowBuf stages -> DFF.CK -> internal CK-to-Q -> Mux tree -> Out, on the order of 50-160 hops even at the largest configurations tested), not by total fanout breadth. No rewrite triggered per the task's own '>=2x margin -> leave as-is' instruction."
+  },
+
+  "part_b_local_interconnect_underestimate": {
+    "readme_reference": "README:357-359 (bug #4): \"Local interconnect will have an ever-larger impact on power and timing as technology scales... we have not implemented a method for automatically estimating them... Evaluations for 22nm [and below should be treated with this in mind]\" -- this project's own tech file is tech/tech_models/Bulk22LVT.model, i.e. exactly the node this bug flags.",
+    "what_is_modelled": "CellMacros.cc:322-327 (updateInverter, and the equivalent block in every other cell macro) adds an INTRA-CELL metal-1 stub: wire_length = folds * cell_height, wire_cap = calculateWireCapacitance(\"Metal1\", ...). This estimates the wiring INSIDE one standard cell (from the transistor drain to the cell's own output pin, scaled by how many parallel fingers ('folds') the cell's drive strength requires) and is baked into that cell's cached, load-independent self-capacitance (Part 1.3 of the earlier investigation report). It is NOT inter-cell routing.",
+    "what_is_not_modelled": "Every net DFFRAM.cc creates via createNet() is a bare ElectricalNet with m_distributed_cap_=m_distributed_res_=0 (the ElectricalNet constructor default) -- DFFRAM.cc never calls setDistributedCap()/setDistributedRes() on any of its own nets (only BroadcastHTree.cc/RepeatedLink.cc do that, for their own internal wire-model levels, and DFFRAM no longer uses either of those after Phase 4.1). So the wire connecting one gate's output to the next gate's input carries exactly zero capacitance and zero resistance, everywhere in DFFRAM.",
+    "zero_wire_load_nets_enable_path": [
+      "NAND2_CKGate0_Out", "CKGate0_Out",
+      "EnBufOut_0 .. EnBufOut_{n_enable_stages-1}",
+      "NAND2_CKGate1_Outs<i> (per row)", "CKGate1_Outs<i> (per row)",
+      "RowBufOut_<i>_0 .. RowBufOut_<i>_{n_buf_stages-1} (per row, per stage)"
+    ],
+    "zero_wire_load_nets_read_path": [
+      "Dec_Out<i> (decoder output, per entry)",
+      "DFF_Out<i> (each row's Q output, feeding the Mux, per entry)",
+      "Mux_Out"
+    ],
+    "quantification": {
+      "method": "DSENT's own calculateWireCapacitance(), Local metal layer (tech/tech_models/Bulk22LVT.model: 32nm min width/spacing, same formula the codebase already applies to BroadcastHTree/RepeatedLink, just not applied inside DFFRAM), evaluated via the wire_diag temporary subcommand.",
+      "reference_gate_load": "Minimum-size (X1) NAND2/INV/BUF A_Cap = 4.52571e-16 F (from the StdCellLib cache, same for all three -- input cap is set by transistor gate width, roughly independent of gate function).",
+      "local_point_to_point_hops": [
+        {"hops": 1, "length_m": 1.2e-07, "wire_cap_F": 2.048858e-17, "pct_of_gate_cap": 4.53},
+        {"hops": 2, "length_m": 2.4e-07, "wire_cap_F": 4.097715e-17, "pct_of_gate_cap": 9.05},
+        {"hops": 3, "length_m": 3.6e-07, "wire_cap_F": 6.146573e-17, "pct_of_gate_cap": 13.58},
+        {"hops": 4, "length_m": 4.8e-07, "wire_cap_F": 8.195430e-17, "pct_of_gate_cap": 18.11}
+      ],
+      "row_enable_fanout_special_case": {
+        "reason": "Unlike every other net in the list above, the net feeding all N NAND2_CKGate1_i A pins (the row-enable chain's own output) is not a short point-to-point hop -- it must physically span the DFFRAM array, whose footprint the codebase itself already computes as SitePitch=sqrt(array_area) (this is exactly the quantity the OLD BroadcastHTree/EnableTree was sized against before Phase 4.1, and Router.cc's own top-level ClockTree still is).",
+        "site_pitch_at_4_32_m": 1.5749072e-05,
+        "site_pitch_at_512_256_m": 4.9519524e-04,
+        "local_layer_estimate_at_4_32_F": 2.686e-15,
+        "local_layer_estimate_at_4_32_pct_of_gate_cap": 593.5,
+        "local_layer_estimate_at_512_256_F": 8.454873e-14,
+        "local_layer_estimate_at_512_256_pct_of_gate_cap": 18681.9,
+        "caveat": "A real layout would route a span this large on Intermediate/Global metal, not Local (Local's own per-length resistance/capacitance is not representative at hundreds of um) -- this number is an upper-bound sanity check using the SAME layer/formula already used elsewhere in the codebase, not a claim that this is the physically correct value on the correct layer."
+      }
+    },
+    "conclusion": "The missing interconnect capacitance is NOT uniform across DFFRAM. For genuinely local, point-to-point hops (RowBuf chain stages, INV_CKGate1_i->DFF.CK, and by extension the read path's Dec_Out/DFF_Out/Mux_Out nets, all cell-adjacent in a real layout) the missing term is small, plausibly a few percent to ~20% of one gate's input capacitance for a 1-4 gate-pitch hop -- consistent with README bug #4's framing as a real but second-order effect at this node. For the ROW-ENABLE FANOUT net specifically, which must span the array's full physical extent, the missing term is potentially the DOMINANT capacitance at large N/B (>100x a single gate's input cap at (512,256), by this same-formula estimate) -- and this is a direct, disclosed side effect of the EnBuf-chain fix (Closure predecessor task): replacing BroadcastHTree correctly fixed a topology mismatch (Part 2.2 of the earlier investigation, NumberLevels tied to log2(N) rather than real electrical fanout) but also removed the ONLY wire term that specific net had. No wire model added here, per instructions -- reported as a disclosed limitation and written into scripts/run_buffer_sweep.py's ASSUMPTIONS list (item 8) so every sweep run carries this caveat in its own meta.assumptions field."
+  },
+
+  "part_c_phase_ledger": {
+    "methodology_note": "No per-phase git commits exist for this project (Phases 0-5+ were uncommitted working-tree edits on top of a 5-commit history unrelated to the router work -- confirmed in docs/phase6_final_validation_results.json's own Part C methodology note). Transitions below are assembled from three sources, each labelled: (1) THIS SESSION -- freshly measured, by temporarily reverting DFFRAM.cc/.h to their pre-Phase-4.1 (BroadcastHTree) content and re-running the full 32-point sweep against the SAME (current, already-includes-P5-and-VC-select-fix) RouterInputPort.cc, isolating the P4->P4' delta cleanly since nothing else differs between the two runs; (2) REUSED from docs/phase6_final_validation_results.json (baseline->P0, P0->P2/P3/P4-combined, P4->P5 -- all at frequency=6e9 Hz, 32-point sweep, VC/shared-RAM framing, already rigorously validated by a prior session); (3) REUSED from docs/vc_select_fix_findings.json (P5->VC-select-fix -- measured at a fixed total_entries=16 sweep over V=1,2,4,8, not the same depth/width grid, reported qualitatively here for that reason).",
+    "baseline_to_P0": {
+      "source": "REUSED (docs/phase6_final_validation_results.json, 6e9 Hz, 32pt)",
+      "expectation": "tiny, read-pointer weight-bug fix only",
+      "area_total_pct": {"min": -1.4994, "max": -0.0336, "mean": -0.4506},
+      "leak_total_pct": {"min": -1.5905, "max": -0.0349, "mean": -0.4765},
+      "e_write_pct": "unmeasurable at baseline (27/32 configs) -- baseline's WriteBuffer/ReadBuffer events lack matching EventInfo, energy queries throw",
+      "e_read_pct": "unmeasurable at baseline, same reason",
+      "t_critical_pct": {"min": 0.0, "max": 0.0, "mean": 0.0},
+      "wrong_sign_flags": "none -- area/leak both correctly decrease (over-weighted read-pointer bank bug fixed); t_critical correctly untouched (a Result-aggregation bug doesn't touch the timing graph)"
+    },
+    "P0_to_P2_P3_P4_combined": {
+      "source": "REUSED (docs/phase6_final_validation_results.json, 6e9 Hz, 32pt) -- NOT separable into P2/P3/P4 individually, no intermediate checkpoints exist",
+      "expectation": "area/leak up a few percent",
+      "area_total_pct": {"min": -7.7501, "max": 26.1251, "mean": 4.7151},
+      "leak_total_pct": {"min": -8.7598, "max": 30.0483, "mean": 5.1786},
+      "e_write_pct": {"min": 14.9012, "max": 116.6816, "mean": 43.1263, "n": 18, "skipped": 14},
+      "e_read_pct": {"min": -8.4992, "max": 2.1497, "mean": -2.1372, "n": 18, "skipped": 14},
+      "t_critical_pct": {"min": -60.6846, "max": 25.1085, "mean": 0.2605},
+      "wrong_sign_flags": "5/32 configs (depth=512 at all 4 widths, plus depth=256/width=256) show area/leak DECREASING (-0.7% to -8.8%) against the 'up a few percent' expectation -- attributed (in the source report) to old BroadcastHTree hitting a flat timing-optimizer sizing ceiling at very large fanout, differently from Phase 0's single-gate fanout; reported there as plausible, not proven."
+    },
+    "P4_to_P4prime_enable_buffer_chain": {
+      "source": "THIS SESSION -- fresh, isolated measurement (frequency=1e9 Hz, timing_opt=false, 32pt grid, RouterInputPort.cc held fixed, DFFRAM.cc/.h swapped between BroadcastHTree and EnableBuf)",
+      "expectation": "t_critical/e_write down (fix's whole purpose); area/leak small move either way (chain replaces tree, different silicon); e_read exactly unchanged (fix never touches the read path)",
+      "area_ram_pct": {"min": -0.5413, "max": -0.0480, "mean": -0.2259},
+      "leak_ram_pct": {"min": -0.4252, "max": -0.0341, "mean": -0.1716},
+      "e_write_pct": {"min": -6.0170, "max": -0.9738, "mean": -2.9888},
+      "e_read_mux_pct": {"min": 0.0, "max": 0.0, "mean": 0.0},
+      "t_critical_pct": {"min": -57.8999, "max": -8.5643, "mean": -31.0173},
+      "wrong_sign_flags": "none across all 32 points -- every metric moved in the expected direction, e_read exactly 0.000% everywhere (bit-identical)."
+    },
+    "P4prime_to_P5_activity": {
+      "source": "REUSED (docs/phase6_final_validation_results.json's own 'phase4_to_phase5' delta, 6e9 Hz, 32pt) -- justified reuse: P5 (WriteRate/ReadRate/FlitToggleRate replacing hardcoded activity assumptions) is implemented entirely in RouterInputPort.cc's own WE/rate handling and is structurally orthogonal to which DFFRAM clock-distribution implementation sits underneath it (confirmed: the P4->P4' measurement above held RouterInputPort.cc, which already includes P5, fixed and only swapped DFFRAM.cc -- P5's own effect does not depend on that choice).",
+      "expectation": "area/leak/t_critical unchanged; energy changes only",
+      "area_total_pct": {"min": 0.0, "max": 0.0, "mean": 0.0},
+      "leak_total_pct": {"min": 0.0, "max": 0.0, "mean": 0.0},
+      "e_write_pct": {"min": -21.8208, "max": -1.6547, "mean": -10.6458, "n": 18, "skipped": 14},
+      "e_read_pct": {"min": 0.0, "max": 0.0, "mean": 0.0, "n": 18, "skipped": 14},
+      "t_critical_pct": {"min": 0.0, "max": 0.0, "mean": 0.0},
+      "wrong_sign_flags": "none -- exactly matches the 'structure-invariant, energy-only' expectation"
+    },
+    "P5_to_VC_select_fix": {
+      "source": "REUSED, qualitative (docs/vc_select_fix_findings.json) -- measured at total_entries=16, V=1,2,4,8, VCSwitchRate=0/0.25/0.5/1.0, NOT the depth/width grid used elsewhere in this ledger, so no directly-comparable min/max/mean over the 32-point grid is available; reported as the pattern the fix produces rather than grid-matched numbers.",
+      "expectation": "e_read moves (per-address-bit toggle formula corrected); e_write ~flat (address-bus-insensitive, dominated by the DFF-array/data-path term); area/leak/t_critical untouched (activity-only fix, same as P5)",
+      "e_read_pct_by_idx_bits": {"idx_bits_4": -22.44, "idx_bits_3": -18.343, "idx_bits_2": -12.146, "idx_bits_1": 0.0},
+      "e_write_pct_by_idx_bits": {"idx_bits_4": -0.374, "idx_bits_3": -0.197, "idx_bits_2": 0.113, "idx_bits_1": 0.47},
+      "wrong_sign_flags": "none -- e_read's delta magnitude shrinks monotonically toward exactly 0.000% as idx_bits shrinks toward 1 (the LSB-only case where the old and new formulas coincide exactly), matching the fix's own predicted signature; e_write stays under 0.5% throughout, consistent with being address-path-insensitive."
+    }
+  },
+
+  "part_d_iso_capacity_headline": {
+    "distributions": "128 buffers x 4 entries, 16 buffers x 32 entries, 1 buffer x 512 entries -- all B=128, 65536 total bits, frequency=1e9 Hz, timing_opt=false",
+    "methodology": "Standalone DFFRAM per distribution point (via the temporary dffram_diag harness / buffer_characteristics with matching (N,B)). AREA and LEAKAGE are the per-buffer value multiplied by buffer_count (every buffer instance exists in silicon simultaneously, all the time). e_read, e_write, and t_critical are the PER-BUFFER value only, not summed across the distribution -- a single read or write access touches exactly one buffer in a many-small-buffers system, and a critical path is inherently a per-instance property, never additive. This is the interpretation that reproduces the task-stated baseline's order of magnitude (see below); the alternative 'N VCs sharing one physical RAM' interpretation, tried in a prior session (docs/phase6_final_validation_results.json, part_d), produced e_read/t_critical ratios of ~1.1x/1.0x -- two orders of magnitude off the stated reference -- and is not reused here.",
+    "before_htree_era": {
+      "128x4": {"area_active_distribution_m2": 1.24387e-07, "leak_distribution_W": 0.11155036, "e_read_per_access_J": 1.711129e-13, "e_write_per_access_J": 3.766913e-13, "t_critical_s": 1.028151e-10},
+      "16x32": {"area_active_distribution_m2": 1.253021e-07, "leak_distribution_W": 0.11305123, "e_read_per_access_J": 1.495753e-12, "e_write_per_access_J": 2.198060e-12, "t_critical_s": 1.600391e-10},
+      "1x512": {"area_active_distribution_m2": 1.232730e-07, "leak_distribution_W": 0.11172422, "e_read_per_access_J": 2.306950e-11, "e_write_per_access_J": 3.297783e-11, "t_critical_s": 7.648720e-10},
+      "area_spread_pct": 1.6460,
+      "leak_spread_pct": 1.3455,
+      "e_read_ratio_max_over_min": 134.8204,
+      "e_write_ratio_max_over_min": 87.5460,
+      "t_critical_ratio_max_over_min": 7.4393
+    },
+    "after_final": {
+      "128x4": {"area_active_distribution_m2": 1.242681e-07, "leak_distribution_W": 0.11147319, "e_read_per_access_J": 1.711129e-13, "e_write_per_access_J": 3.709365e-13, "t_critical_s": 8.968225e-11},
+      "16x32": {"area_active_distribution_m2": 1.251466e-07, "leak_distribution_W": 0.11294513, "e_read_per_access_J": 1.495753e-12, "e_write_per_access_J": 2.149530e-12, "t_critical_s": 1.123246e-10},
+      "1x512": {"area_active_distribution_m2": 1.231021e-07, "leak_distribution_W": 0.11160317, "e_read_per_access_J": 2.306950e-11, "e_write_per_access_J": 3.234796e-11, "t_critical_s": 3.489372e-10},
+      "area_spread_pct": 1.6608,
+      "leak_spread_pct": 1.3204,
+      "e_read_ratio_max_over_min": 134.8204,
+      "e_write_ratio_max_over_min": 87.2062,
+      "t_critical_ratio_max_over_min": 3.8908
+    },
+    "task_stated_baseline_reference": {"area_spread_pct": 0.9, "e_read_ratio": 121.5, "t_critical_ratio": 8.9},
+    "reproduction_note": "The 'before' (H-tree era) numbers measured here -- area_spread=1.65%, e_read_ratio=134.8x, t_critical_ratio=7.44x -- are the right order of magnitude and correct qualitative shape against the task-stated reference (0.9% / 121.5x / 8.9x), but not an exact match, most likely because this measurement's exact software revision (P5 activity params + VC-select fix already applied to RouterInputPort.cc, frequency=1e9, timing_opt=false) differs from whatever produced the original stated numbers. This is disclosed rather than forced to match.",
+    "headline_answer_per_metric": {
+      "area": "UNCHANGED (gap neither narrowed nor widened materially): 1.646% -> 1.661% spread, a +0.9%-relative widening that is well within measurement/rounding noise for a fix that only touches DFFRAM's own row-enable structure, not the DFF array or decoder that dominate area.",
+      "leakage": "UNCHANGED: 1.345% -> 1.320% spread, a negligible narrowing, same reasoning as area.",
+      "e_read": "EXACTLY UNCHANGED: 134.8204x both before and after, to the digit shown -- confirms (yet again, now at the whole-distribution level) that this fix never touches the read path.",
+      "e_write": "NEGLIGIBLY NARROWED: 87.546x -> 87.206x, a ~0.4% relative narrowing -- present but small, consistent with the P4->P4' e_write deltas (mean -2.99%) being of similar small magnitude at every individual point and therefore nearly cancelling in a max/min ratio.",
+      "t_critical": "SUBSTANTIALLY NARROWED -- the headline result: 7.439x -> 3.891x, very nearly HALVED (-47.7% relative reduction in the ratio). This is because the fix's t_critical improvement is far larger in absolute terms for the LARGE, single-buffer end of the range (the 1x512 point improves from 7.649e-10s to 3.489e-10s, a 54.4% cut) than for the many-small-buffers end (the 128x4 point improves from 1.028e-10s to 8.968e-11s, a 12.8% cut) -- exactly what Part C's own P4->P4' ledger row already showed as a general pattern (t_critical improvement magnitude grows with N)."
+    },
+    "conclusion": "For the original research question this project was built around -- comparing many-small-buffers against few-large-buffers switch architectures at equal total capacity -- this closure task's fix materially changes the answer along exactly one axis: the two architectures' CRITICAL-PATH/frequency-capability gap is now much smaller (nearly half) than it was under the old BroadcastHTree-based clock distribution, while the area/leakage/energy story is essentially unchanged. A comparison that leaned on the old timing gap to argue for one architecture over the other would need to be revisited; a comparison based on area or energy would not."
+  }
+}

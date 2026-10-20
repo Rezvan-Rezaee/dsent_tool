@@ -1,0 +1,201 @@
+# All units are in SI, (volts, meters, kelvin, farads, ohms, amps, etc.)
+
+Name = FinFET7LVT
+Vdd = 0.7
+
+# Temperature (K) the operating temperature we assume for leakage
+Temperature = 340
+
+# Parameters used for characterizing these parameters
+# Characterization temperature (K)
+Nmos->CharacterizedTemperature = 300.0
+Pmos->CharacterizedTemperature = 300.0
+
+# Characterization voltage (K)
+Nmos->CharacterizedVdd = 0.7
+Pmos->CharacterizedVdd = 0.7
+
+# area += gate_pitch × getTotalHeight() × GatePitches
+# area depends on PitchContacted, Tracks, Metal1 dimensions.
+# Contacted gate pitch (m)
+Gate->PitchContacted = 54e-9
+
+# double nmos_unit_width = gate_min_width;
+# double pmos_unit_width = gate_min_width * pn_ratio;
+# Min gate width (m) one fin of layout width
+Gate->MinWidth = 27e-9
+
+# A capacitor's current depends on how fast its voltage changes: i = C · dv/dt.
+# In AC analysis the voltage is a sine wave, v = V·sin(2πft). Differentiate it and you get dv/dt = V·2πf·cos(2πft). # So the current amplitude is |i| = C · 2πf · V.
+# Gate cap per unit width (F/m) Take IM(Vgon), divide by 2π×10⁶, divide by 27e-9.
+# Your AC source has amplitude 1 V, so it drops out, leaving C = |i| / (2πf).
+Gate->CapPerWidth = 2.55e-9
+# Source/Drain cap per unit width (F/m) IM(Voff)
+Drain->CapPerWidth = 1.30e-9
+
+#------------------------------------------------------------------------------
+# I_Eff definition in Na, IEDM 2002
+#       I_EFF = (I(VG = 0.35, VD = 0.7) + I(VG = 0.7, VD = 0.35))/2
+#       R_EFF = VDD / I_EFF * 1 / (2 ln(2))
+# This is generally more accurate for when the delay is input transition time
+# limited
+#------------------------------------------------------------------------------
+# Effective resistance (Ohm-m)
+Nmos->EffResWidth = 5.8772e-04
+Pmos->EffResWidth = 7.6844e-04
+
+#------------------------------------------------------------------------------
+# The ratio of extra effective resistance with each additional stacked
+# transistor
+#       EffResStackRatio = (R_EFF_NAND2 - R_EFF_INV) / R_EFF_INV)
+# For example, inverter has an normalized effective drive resistance of 1.0.
+# A NAND2 (2-stack) will have an effective drive of 1.0 + 0.7, a NAND3 (3-stack)
+# will have an effective drive of 1.0 + 2 * 0.7. Use NORs for Pmos. This fit
+# works relatively well up to 4 stacks. This value will change depending on the
+# VDD used. 
+#------------------------------------------------------------------------------
+# Effective resistance stack ratio
+Nmos->EffResStackRatio = 0.554
+Pmos->EffResStackRatio = 0.909
+
+#------------------------------------------------------------------------------
+# I_OFF defined as |I_DS| for |V_DS| = V_DD and |V_GS| = 0.0
+#       Minimum off current is used in technologies where I_OFF stops scaling
+#       with transistor width below some threshold
+#------------------------------------------------------------------------------
+# Off current per width (A/m)
+Nmos->OffCurrent = 8.7501e-03
+Pmos->OffCurrent = 8.3389e-03
+# Minimum off current (A)
+Nmos->MinOffCurrent = 2.3625e-11
+Pmos->MinOffCurrent = 2.2515e-11
+
+# Subthreshold swing (V/dec)        
+Nmos->SubthresholdSwing = 6.2800e-02
+Pmos->SubthresholdSwing = 6.2300e-02
+# DIBL factor (V/V)
+Nmos->DIBL = 2.8600e-02
+Pmos->DIBL = 3.9100e-02
+# Subthreshold temperature swing (K/dec)
+Nmos->SubthresholdTempSwing = 7.1400e+01
+Pmos->SubthresholdTempSwing = 5.9700e+01
+#------------------------------------------------------------------------------
+
+# =============================================================================
+# Parameters for interconnect
+# =============================================================================
+# Widths and spacings below are [OK], read from asap7_tech_1x_201209.lef
+# in The-OpenROAD-Project/asap7sc7p5t_28, techlef_misc/.
+#
+# Thickness, resistivity and dielectric values are [CALIBRATED] against
+# OpenROAD-flow-scripts' ASAP7 platform per-layer RC file (setRC.tcl),
+# assuming aspect ratio 2.0 (thickness = 2 x width). Dielectric thickness
+# is set equal to metal thickness, following TG11LVT's own convention.
+# Full derivation, sources and formulas: WIRE_CALIBRATION.md.
+#
+# NOTE: these resistivities (2.0-2.8e-8) are LOWER than TG11LVT's 6.8e-8
+# at comparable widths, i.e. optimistic about scattering. See the .md.
+#
+# Layer mapping, by pitch:
+#   Metal1      -> M1        36 nm pitch
+#   Local       -> M2, M3    36 nm pitch
+#   Intermediate-> M4, M5    48 nm pitch
+#   Semiglobal  -> M6, M7    64 nm pitch
+#   Global      -> M8, M9    80 nm pitch
+
+Wire->AvailableLayers = [Metal1,Local,Intermediate,Semiglobal,Global]
+
+# Metal 1 Wire (used for std cell routing only)  ASAP7 M1
+# Min width (m)
+Wire->Metal1->MinWidth = 18e-9
+# Min spacing (m)
+Wire->Metal1->MinSpacing = 18e-9
+# Resistivity (Ohm-m)                            [CALIBRATED] setRC M1
+Wire->Metal1->Resistivity = 4.56e-8
+# Metal thickness (m)                            [ASSUMED] AR 2.0
+Wire->Metal1->MetalThickness = 36.0e-9
+# Dielectric thickness (m)                       [ASSUMED]
+Wire->Metal1->DielectricThickness = 36.0e-9
+# Dielectric constant                            [CALIBRATED] from Local C
+Wire->Metal1->DielectricConstant = 3.7
+
+# Local wire, 1.0X of the M1 pitch               ASAP7 M2, M3
+# Min width (m)
+Wire->Local->MinWidth = 18e-9
+# Min spacing (m)
+Wire->Local->MinSpacing = 18e-9
+# Resistivity (Ohm-m)                            [CALIBRATED] setRC M2-M3
+Wire->Local->Resistivity = 1.98e-8
+# Metal thickness (m)                            [ASSUMED] AR 2.0
+Wire->Local->MetalThickness = 36.0e-9
+# Dielectric thickness (m)                       [ASSUMED]
+Wire->Local->DielectricThickness = 36.0e-9
+# Dielectric constant                            [CALIBRATED]
+Wire->Local->DielectricConstant = 3.7
+
+# Intermediate wire, 1.33X the M1 pitch          ASAP7 M4, M5
+# Min width (m)
+Wire->Intermediate->MinWidth = 24e-9
+# Min spacing (m)
+Wire->Intermediate->MinSpacing = 24e-9
+# Resistivity (Ohm-m)                            [CALIBRATED] setRC M4-M5
+Wire->Intermediate->Resistivity = 2.13e-8
+# Metal thickness (m)                            [ASSUMED] AR 2.0
+Wire->Intermediate->MetalThickness = 48.0e-9
+# Dielectric thickness (m)                       [ASSUMED]
+Wire->Intermediate->DielectricThickness = 48.0e-9
+# Dielectric constant                            [CALIBRATED]
+Wire->Intermediate->DielectricConstant = 3.9
+
+# Semiglobal wire, 1.78X the M1 pitch            ASAP7 M6, M7
+# Min width (m)
+Wire->Semiglobal->MinWidth = 32e-9
+# Min spacing (m)
+Wire->Semiglobal->MinSpacing = 32e-9
+# Resistivity (Ohm-m)                            [CALIBRATED] setRC M6-M7
+Wire->Semiglobal->Resistivity = 2.50e-8
+# Metal thickness (m)                            [ASSUMED] AR 2.0
+Wire->Semiglobal->MetalThickness = 64.0e-9
+# Dielectric thickness (m)                       [ASSUMED]
+Wire->Semiglobal->DielectricThickness = 64.0e-9
+# Dielectric constant                            [CALIBRATED]
+Wire->Semiglobal->DielectricConstant = 4.0
+
+# Global wire, 2.22X the M1 pitch                ASAP7 M8, M9
+# Min width (m)
+Wire->Global->MinWidth = 40e-9
+# Min spacing (m)
+Wire->Global->MinSpacing = 40e-9
+# Resistivity (Ohm-m)                            [CALIBRATED] setRC M8-M9
+Wire->Global->Resistivity = 2.78e-8
+# Metal thickness (m)                            [ASSUMED] AR 2.0
+Wire->Global->MetalThickness = 80.0e-9
+# Dielectric thickness (m)                       [ASSUMED]
+Wire->Global->DielectricThickness = 80.0e-9
+# Dielectric constant                            [CALIBRATED]
+Wire->Global->DielectricConstant = 2.2
+
+# =============================================================================
+# Parameters for Standard Cells
+# =============================================================================
+
+# The height of the standard cell is usually a multiple of the vertical
+# M1 pitch (tracks). By definition, an X1 size cell has transistors
+# that fit exactly in the given cell height without folding, or leaving
+# any wasted vertical area
+
+# Reasonable values for the number of M1 tracks that we have seen are 8-14
+# ASAP7 uses a 7.5-track library, below the range in the comment above.
+# That is a genuine FinFET-era shift, not an error.
+# Check: 7.5 x 36 nm = 270 nm, the real ASAP7 cell height.
+StdCell->Tracks = 7.5
+# Height overhead due to supply rails, well spacing, etc. Note that this will grow
+# if the height of the standard cell decreases!
+StdCell->HeightOverheadFactor = 1.400
+
+# Sets the available sizes of each standard cell. Keep in mind that
+# 1.0 is the biggest cell without any transistor folding
+# NOTE: fractional sizes are not physical for FinFETs, where drive comes
+# in whole fins. Replace this list with the drive strengths ASAP7 actually
+# ships - read them off the cell names in the Liberty files.
+StdCell->AvailableSizes = [1.0, 2.0, 4.0, 6.0, 8.0, 12.0, 16.0]

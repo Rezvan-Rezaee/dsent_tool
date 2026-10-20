@@ -1,0 +1,490 @@
+{
+  "meta": {
+    "cacti_bin": "/mnt/c/Users/rezva/Documents/paradox/cacti/cacti/cacti",
+    "template_cfg": "/mnt/c/Users/rezva/Documents/paradox/cacti/cacti/cache.cfg",
+    "tech_um": 0.022,
+    "temperature_k": 340,
+    "cell_type": "itrs-hp",
+    "ports": "1R+1W exclusive",
+    "cacti_git_hash": "1ffd8dfb10303d306ecd8d215320aea07651e878",
+    "cacti_tree_dirty": true,
+    "run_timestamp": "2026-08-18T19:25:35.857992+00:00",
+    "assumptions": [
+      "Add ECC is disabled (\"false\") to match DSENT's DFFRAM, which carries no ECC overhead of its own.",
+      "Optimize ED or ED^2 is set to \"NONE\" so the weight/deviate design objective (100:0:0:0:0, i.e. minimize delay only) actually determines the chosen organization -- leaving it at ED or ED^2 would silently override the weight/deviate settings.",
+      "CACTI's area figure includes array periphery (decoders, sense amps, H-tree wiring, drivers) and internal routing overhead, whereas DSENT's area_ram sums bare cell (DFF + mux) footprints only. The two area numbers therefore carry opposite biases -- CACTI trends high, DSENT trends low -- and are not apples-to-apples without adjustment."
+    ]
+  },
+  "points": [
+    {
+      "depth": 32,
+      "width": 32,
+      "size_bytes": 128,
+      "area_um2": 335.917,
+      "area_total_um2": 335.9166552,
+      "area_per_bit_um2": 0.3280439453125,
+      "e_read_pJ": 0.155728,
+      "e_write_pJ": 0.18970700000000001,
+      "e_read_per_bit_fJ": 4.8665,
+      "e_write_per_bit_fJ": 5.928343750000001,
+      "leak_mW": 0.0230773,
+      "t_read_ns": 0.0634255,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 1.0
+      }
+    },
+    {
+      "depth": 64,
+      "width": 32,
+      "size_bytes": 256,
+      "area_um2": 643.3149999999999,
+      "area_total_um2": 643.31465325,
+      "area_per_bit_um2": 0.31411865234374997,
+      "e_read_pJ": 0.291067,
+      "e_write_pJ": 0.27581900000000004,
+      "e_read_per_bit_fJ": 9.09584375,
+      "e_write_per_bit_fJ": 8.61934375,
+      "leak_mW": 0.0411942,
+      "t_read_ns": 0.0707621,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 2.0
+      }
+    },
+    {
+      "depth": 128,
+      "width": 32,
+      "size_bytes": 512,
+      "area_um2": 1407.19,
+      "area_total_um2": 1407.18435925,
+      "area_per_bit_um2": 0.34355224609375,
+      "e_read_pJ": 0.540137,
+      "e_write_pJ": 0.426437,
+      "e_read_per_bit_fJ": 16.87928125,
+      "e_write_per_bit_fJ": 13.32615625,
+      "leak_mW": 0.0904471,
+      "t_read_ns": 0.0750894,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 4.0
+      }
+    },
+    {
+      "depth": 256,
+      "width": 32,
+      "size_bytes": 1024,
+      "area_um2": 2152.25,
+      "area_total_um2": 2152.24524367,
+      "area_per_bit_um2": 0.262725830078125,
+      "e_read_pJ": 0.605168,
+      "e_write_pJ": 0.5081089999999999,
+      "e_read_per_bit_fJ": 18.9115,
+      "e_write_per_bit_fJ": 15.878406249999998,
+      "leak_mW": 0.16864,
+      "t_read_ns": 0.0877749,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 4.0
+      }
+    },
+    {
+      "depth": 512,
+      "width": 32,
+      "size_bytes": 2048,
+      "area_um2": 4110.0199999999995,
+      "area_total_um2": 4110.0169533,
+      "area_per_bit_um2": 0.25085571289062497,
+      "e_read_pJ": 0.878728,
+      "e_write_pJ": 0.756123,
+      "e_read_per_bit_fJ": 27.46025,
+      "e_write_per_bit_fJ": 23.628843749999998,
+      "leak_mW": 0.307278,
+      "t_read_ns": 0.103338,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 8.0
+      }
+    },
+    {
+      "depth": 32,
+      "width": 64,
+      "size_bytes": 256,
+      "area_um2": 759.631,
+      "area_total_um2": 759.63063696,
+      "area_per_bit_um2": 0.37091357421875,
+      "e_read_pJ": 0.349452,
+      "e_write_pJ": 0.417409,
+      "e_read_per_bit_fJ": 5.4601875,
+      "e_write_per_bit_fJ": 6.522015625,
+      "leak_mW": 0.0414928,
+      "t_read_ns": 0.0703651,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 1.0
+      }
+    },
+    {
+      "depth": 64,
+      "width": 64,
+      "size_bytes": 512,
+      "area_um2": 1682.1,
+      "area_total_um2": 1682.10051017,
+      "area_per_bit_um2": 0.4106689453125,
+      "e_read_pJ": 0.683234,
+      "e_write_pJ": 0.6527390000000001,
+      "e_read_per_bit_fJ": 10.67553125,
+      "e_write_per_bit_fJ": 10.199046875,
+      "leak_mW": 0.0918275,
+      "t_read_ns": 0.074575,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 2.0
+      }
+    },
+    {
+      "depth": 128,
+      "width": 64,
+      "size_bytes": 1024,
+      "area_um2": 2427.16,
+      "area_total_um2": 2427.15826626,
+      "area_per_bit_um2": 0.2962841796875,
+      "e_read_pJ": 0.7482650000000001,
+      "e_write_pJ": 0.8176150000000001,
+      "e_read_per_bit_fJ": 11.691640625000002,
+      "e_write_per_bit_fJ": 12.775234375000002,
+      "leak_mW": 0.17002,
+      "t_read_ns": 0.0872605,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 2.0
+      }
+    },
+    {
+      "depth": 256,
+      "width": 64,
+      "size_bytes": 2048,
+      "area_um2": 4736.53,
+      "area_total_um2": 4736.5315101,
+      "area_per_bit_um2": 0.2890948486328125,
+      "e_read_pJ": 1.42642,
+      "e_write_pJ": 1.2323,
+      "e_read_per_bit_fJ": 22.2878125,
+      "e_write_per_bit_fJ": 19.2546875,
+      "leak_mW": 0.313506,
+      "t_read_ns": 0.103069,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 4.0
+      }
+    },
+    {
+      "depth": 512,
+      "width": 64,
+      "size_bytes": 4096,
+      "area_um2": 7583.82,
+      "area_total_um2": 7583.8539285,
+      "area_per_bit_um2": 0.2314398193359375,
+      "e_read_pJ": 1.71604,
+      "e_write_pJ": 1.58849,
+      "e_read_per_bit_fJ": 26.813125,
+      "e_write_per_bit_fJ": 24.82015625,
+      "leak_mW": 0.603575,
+      "t_read_ns": 0.119306,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 4.0
+      }
+    },
+    {
+      "depth": 32,
+      "width": 128,
+      "size_bytes": 512,
+      "area_um2": 2238.0299999999997,
+      "area_total_um2": 2238.0321828,
+      "area_per_bit_um2": 0.5463940429687499,
+      "e_read_pJ": 0.923829,
+      "e_write_pJ": 1.05974,
+      "e_read_per_bit_fJ": 7.2174140625000005,
+      "e_write_per_bit_fJ": 8.27921875,
+      "leak_mW": 0.0946088,
+      "t_read_ns": 0.0742077,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 1.0
+      }
+    },
+    {
+      "depth": 64,
+      "width": 128,
+      "size_bytes": 1024,
+      "area_um2": 2983.0899999999997,
+      "area_total_um2": 2983.0870953000003,
+      "area_per_bit_um2": 0.36414672851562496,
+      "e_read_pJ": 0.9888600000000001,
+      "e_write_pJ": 1.39103,
+      "e_read_per_bit_fJ": 7.725468750000001,
+      "e_write_per_bit_fJ": 10.867421875,
+      "leak_mW": 0.172801,
+      "t_read_ns": 0.0868932,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 1.0
+      }
+    },
+    {
+      "depth": 128,
+      "width": 128,
+      "size_bytes": 2048,
+      "area_um2": 5858.150000000001,
+      "area_total_um2": 5858.1818904,
+      "area_per_bit_um2": 0.35755310058593753,
+      "e_read_pJ": 1.9789199999999998,
+      "e_write_pJ": 2.11762,
+      "e_read_per_bit_fJ": 15.460312499999999,
+      "e_write_per_bit_fJ": 16.54390625,
+      "leak_mW": 0.321642,
+      "t_read_ns": 0.102601,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 2.0
+      }
+    },
+    {
+      "depth": 256,
+      "width": 128,
+      "size_bytes": 4096,
+      "area_um2": 8705.45,
+      "area_total_um2": 8705.484942,
+      "area_per_bit_um2": 0.26566925048828127,
+      "e_read_pJ": 2.26855,
+      "e_write_pJ": 2.80663,
+      "e_read_per_bit_fJ": 17.723046874999998,
+      "e_write_per_bit_fJ": 21.926796875,
+      "leak_mW": 0.611711,
+      "t_read_ns": 0.118838,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 2.0
+      }
+    },
+    {
+      "depth": 512,
+      "width": 128,
+      "size_bytes": 8192,
+      "area_um2": 14359.2,
+      "area_total_um2": 14359.201416,
+      "area_per_bit_um2": 0.21910400390625,
+      "e_read_pJ": 2.79463,
+      "e_write_pJ": 4.13148,
+      "e_read_per_bit_fJ": 21.833046875,
+      "e_write_per_bit_fJ": 32.2771875,
+      "leak_mW": 1.1897,
+      "t_read_ns": 0.158807,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 2.0
+      }
+    },
+    {
+      "depth": 32,
+      "width": 256,
+      "size_bytes": 1024,
+      "area_um2": 6675.35,
+      "area_total_um2": 6675.340868799999,
+      "area_per_bit_um2": 0.814862060546875,
+      "e_read_pJ": 2.8188000000000004,
+      "e_write_pJ": 3.09063,
+      "e_read_per_bit_fJ": 11.010937500000002,
+      "e_write_per_bit_fJ": 12.0727734375,
+      "leak_mW": 0.18977,
+      "t_read_ns": 0.0895598,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 1.0
+      }
+    },
+    {
+      "depth": 64,
+      "width": 256,
+      "size_bytes": 2048,
+      "area_um2": 8112.42,
+      "area_total_um2": 8112.398937999998,
+      "area_per_bit_um2": 0.495142822265625,
+      "e_read_pJ": 2.9503899999999996,
+      "e_write_pJ": 3.75473,
+      "e_read_per_bit_fJ": 11.524960937499998,
+      "e_write_per_bit_fJ": 14.6669140625,
+      "leak_mW": 0.335162,
+      "t_read_ns": 0.102308,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 1.0
+      }
+    },
+    {
+      "depth": 128,
+      "width": 256,
+      "size_bytes": 4096,
+      "area_um2": 10959.699999999999,
+      "area_total_um2": 10959.765188000001,
+      "area_per_bit_um2": 0.33446350097656247,
+      "e_read_pJ": 3.2400200000000003,
+      "e_write_pJ": 5.10938,
+      "e_read_per_bit_fJ": 12.656328125000002,
+      "e_write_per_bit_fJ": 19.958515625,
+      "leak_mW": 0.625231,
+      "t_read_ns": 0.118545,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 1.0
+      }
+    },
+    {
+      "depth": 256,
+      "width": 256,
+      "size_bytes": 8192,
+      "area_um2": 16613.5,
+      "area_total_um2": 16613.42182,
+      "area_per_bit_um2": 0.25350189208984375,
+      "e_read_pJ": 3.7661000000000002,
+      "e_write_pJ": 7.765499999999999,
+      "e_read_per_bit_fJ": 14.711328125000001,
+      "e_write_per_bit_fJ": 30.333984374999996,
+      "leak_mW": 1.20322,
+      "t_read_ns": 0.158514,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 1.0
+      }
+    },
+    {
+      "depth": 512,
+      "width": 256,
+      "size_bytes": 16384,
+      "area_um2": 30913.5,
+      "area_total_um2": 30913.47584,
+      "area_per_bit_um2": 0.23585128784179688,
+      "e_read_pJ": 7.63895,
+      "e_write_pJ": 10.3127,
+      "e_read_per_bit_fJ": 29.839648437500003,
+      "e_write_per_bit_fJ": 40.283984374999996,
+      "leak_mW": 2.14607,
+      "t_read_ns": 0.199139,
+      "organization": {
+        "Ndwl": 2.0,
+        "Ndbl": 2.0,
+        "Nspd": 2.0
+      }
+    }
+  ],
+  "failures": [
+    {
+      "depth": 4,
+      "width": 32,
+      "error": "Cache size must >=64"
+    },
+    {
+      "depth": 8,
+      "width": 32,
+      "error": "Cache size must >=64"
+    },
+    {
+      "depth": 16,
+      "width": 32,
+      "error": "Cache size                    : 64\nBlock size                    : 4\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    },
+    {
+      "depth": 4,
+      "width": 64,
+      "error": "Cache size must >=64"
+    },
+    {
+      "depth": 8,
+      "width": 64,
+      "error": "Cache size                    : 64\nBlock size                    : 8\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    },
+    {
+      "depth": 16,
+      "width": 64,
+      "error": "Cache size                    : 128\nBlock size                    : 8\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    },
+    {
+      "depth": 4,
+      "width": 128,
+      "error": "Cache size                    : 64\nBlock size                    : 16\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    },
+    {
+      "depth": 8,
+      "width": 128,
+      "error": "Cache size                    : 128\nBlock size                    : 16\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    },
+    {
+      "depth": 16,
+      "width": 128,
+      "error": "Cache size                    : 256\nBlock size                    : 16\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    },
+    {
+      "depth": 4,
+      "width": 256,
+      "error": "Cache size                    : 128\nBlock size                    : 32\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    },
+    {
+      "depth": 8,
+      "width": 256,
+      "error": "Cache size                    : 256\nBlock size                    : 32\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    },
+    {
+      "depth": 16,
+      "width": 256,
+      "error": "Cache size                    : 512\nBlock size                    : 32\nAssociativity                 : 1\nRead only ports               : 1\nWrite only ports              : 1\nRead write ports              : 0\nSingle ended read ports       : 0\nCache banks (UCA)             : 1\nTechnology                    : 0.022\nTemperature                   : 340\nTag size                      : 42\narray type                    : Scratch RAM\nModel as memory               : 0\nModel as 3D memory       \t : 0\nAccess mode                   : 0\nData array cell type          : 0\nData array peripheral type    : 0\nTag array cell type           : 0\nTag array peripheral type     : 0\nOptimization target           : 0\nDesign objective (UCA wt)     : 100 0 0 0 0\nDesign objective (UCA dev)    : 20 100000 100000 100000 100000\nCache model                   : 0\nNuca bank                     : 0\nWire inside mat               : 1\nWire outside mat              : 1\nInterconnect projection       : 1\nWire signaling               : 0\nPrint level                   : 1\nECC overhead                  : 0\nPage size                     : 8192\nBurst length                  : 8\nInternal prefetch width       : 8\nForce cache config            : 0\nSubarray Driver direction       : 1\niostate                       : WRITE\ndram_ecc                      : NO_ECC\nio_type                     : DDR3\ndram_dimm                      : UDIMM\nIO Area (sq.mm) = inf\nIO Timing Margin (ps) = -14.1667\nIO Votlage Margin (V) = 0.155\nIO Dynamic Power (mW) = 1506.36 PHY Power (mW) = 232.752 PHY Wakeup Time (us) = 27.503\nIO Termination and Bias Power (mW) = 2505.96\nERROR: no valid data array organizations found"
+    }
+  ],
+  "sanity_checks": {
+    "area_per_bit_decreases_with_depth": {
+      "pass": false,
+      "per_width": {
+        "32": false,
+        "64": false,
+        "128": true,
+        "256": true
+      }
+    },
+    "read_write_energy_within_2x": {
+      "pass": false
+    },
+    "organization_varies_with_capacity": {
+      "pass": false,
+      "distinct_Ndwl_values": [
+        2.0
+      ],
+      "distinct_Ndbl_values": [
+        2.0
+      ],
+      "varies": false,
+      "subarrays_non_decreasing_with_size": true,
+      "flagged_points": []
+    },
+    "smallest_successful_size_bytes": 128
+  },
+  "sweep_valid": true
+}

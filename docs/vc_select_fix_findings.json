@@ -1,0 +1,239 @@
+{
+  "task": "VC-select activity artifact fix in RouterInputPort -- final resolution and validation",
+  "decision": "Option A: keep the closed-form formula exactly as implemented. No special-casing of p=0. Confirmed and recorded in code (model/electrical/router/RouterInputPort.cc, propagateTransitionInfo()) and here.",
+  "reasoning_recorded": {
+    "two_artifacts_not_one": "The task's stated regression anchor was based on a mistaken assumption about what the pre-change code did. Two pre-existing artifacts were being corrected, not one: (1) vc_id bits pinned constant because VC 0 is hardwired as the selected VC -- the artifact the task targeted -- and (2) index address bits all fed the SAME aggregate TransitionInfo copied from fifo0's LSB (WRIdx_DFF0/RDIdx_DFF0), so every address bit was charged at the LSB's toggle rate of 0.5 instead of its own 1/2^(i+1). DFFRAM exposes per-bit address ports (WRAddr0, WRAddr1, ...) -- per-bit assignment was always expressible; the old code simply never used it.",
+    "artifact_2_overcharged_upper_bits": "Correcting artifact (2) LOWERS e_read and e_write, because it removes an overcharge, not a regression. The exact match at V=8 (idx_bits=1, no upper address bits exist to have been overcharged) is the confirming signature -- see validation item 2 below.",
+    "vc_id_static_level_at_p0_is_correct": "TransitionInfo(0.5, 0, 0.5) (P(1)=0.5, zero toggles) at p=0 for vc_id bits is physically correct, not merely 'the same toggle count as the old value.' VC ids are roughly uniform across V, so averaged over which VC ends up structurally selected, each vc_id bit sits high half the time. The old TransitionInfo(1.0, 0, 0) (P(1)=0) was an artifact of hardwiring VC 0 specifically, not a physical property of the address bus -- so it is intentionally NOT reproduced at p=0."
+  },
+  "validation_2_REPLACED": {
+    "description": "p=0 deltas against the stored pre-change reference numbers, all four V, both e_read and e_write, with attribution. NOT attempting to match the other three -- only V=8 is expected to match.",
+    "points": [
+      {
+        "V": 1,
+        "idx_bits": 4,
+        "e_read_new": 3.032044e-13,
+        "e_read_ref": 3.90929e-13,
+        "e_read_delta_pct": -22.44,
+        "e_write_new": 6.130988e-13,
+        "e_write_ref": 6.153986e-13,
+        "e_write_delta_pct": -0.374
+      },
+      {
+        "V": 2,
+        "idx_bits": 3,
+        "e_read_new": 3.042745e-13,
+        "e_read_ref": 3.726256e-13,
+        "e_read_delta_pct": -18.343,
+        "e_write_new": 6.170111e-13,
+        "e_write_ref": 6.182271e-13,
+        "e_write_delta_pct": -0.197
+      },
+      {
+        "V": 4,
+        "idx_bits": 2,
+        "e_read_new": 2.987667e-13,
+        "e_read_ref": 3.400727e-13,
+        "e_read_delta_pct": -12.146,
+        "e_write_new": 6.213369e-13,
+        "e_write_ref": 6.20635e-13,
+        "e_write_delta_pct": 0.113
+      },
+      {
+        "V": 8,
+        "idx_bits": 1,
+        "e_read_new": 2.596394e-13,
+        "e_read_ref": 2.596394e-13,
+        "e_read_delta_pct": 0.0,
+        "e_write_new": 6.228973e-13,
+        "e_write_ref": 6.199859e-13,
+        "e_write_delta_pct": 0.47
+      }
+    ],
+    "confirmation": "e_read delta magnitude shrinks monotonically as idx_bits shrinks (-22.44% at idx_bits=4, -18.34% at idx_bits=3, -12.15% at idx_bits=2, exactly 0.000% at idx_bits=1) -- exactly the signature predicted by artifact (2): fewer upper address bits means less that could have been overcharged, and at idx_bits=1 there IS no 'upper bit' distinct from the LSB, so the old flat-LSB-replication and the new per-bit-decay formula coincide exactly, and they do: bit-for-bit identical to 10 significant figures. e_write's deltas are far smaller (all under 0.5%, not monotonic in idx_bits) because e_write is dominated by the FlitToggleRate-driven DFF-array term, not the address bus -- consistent with earlier phases' finding that e_write is address-path-insensitive relative to e_read."
+  },
+  "validation_3_sweep": {
+    "description": "VCSwitchRate = 0, 0.25, 0.5, 1.0 (write and read rates set equal) at V = 1,2,4,8, total_entries=16, flit=64. All 16 points.",
+    "points": [
+      {
+        "V": 1,
+        "R": 0.0,
+        "e_read": 3.032044e-13,
+        "e_write": 6.130988e-13
+      },
+      {
+        "V": 1,
+        "R": 0.25,
+        "e_read": 3.259389e-13,
+        "e_write": 6.137735e-13
+      },
+      {
+        "V": 1,
+        "R": 0.5,
+        "e_read": 3.481142e-13,
+        "e_write": 6.143799e-13
+      },
+      {
+        "V": 1,
+        "R": 1.0,
+        "e_read": 3.90929e-13,
+        "e_write": 6.153986e-13
+      },
+      {
+        "V": 2,
+        "R": 0.0,
+        "e_read": 3.042745e-13,
+        "e_write": 6.170111e-13
+      },
+      {
+        "V": 2,
+        "R": 0.25,
+        "e_read": 3.278187e-13,
+        "e_write": 6.177426e-13
+      },
+      {
+        "V": 2,
+        "R": 0.5,
+        "e_read": 3.507664e-13,
+        "e_write": 6.183967e-13
+      },
+      {
+        "V": 2,
+        "R": 1.0,
+        "e_read": 3.950331e-13,
+        "e_write": 6.194847e-13
+      },
+      {
+        "V": 4,
+        "R": 0.0,
+        "e_read": 2.987667e-13,
+        "e_write": 6.213369e-13
+      },
+      {
+        "V": 4,
+        "R": 0.25,
+        "e_read": 3.251248e-13,
+        "e_write": 6.222009e-13
+      },
+      {
+        "V": 4,
+        "R": 0.5,
+        "e_read": 3.507113e-13,
+        "e_write": 6.229635e-13
+      },
+      {
+        "V": 4,
+        "R": 1.0,
+        "e_read": 3.997848e-13,
+        "e_write": 6.242002e-13
+      },
+      {
+        "V": 8,
+        "R": 0.0,
+        "e_read": 2.596394e-13,
+        "e_write": 6.228973e-13
+      },
+      {
+        "V": 8,
+        "R": 0.25,
+        "e_read": 2.972124e-13,
+        "e_write": 6.239271e-13
+      },
+      {
+        "V": 8,
+        "R": 0.5,
+        "e_read": 3.333856e-13,
+        "e_write": 6.248333e-13
+      },
+      {
+        "V": 8,
+        "R": 1.0,
+        "e_read": 4.019635e-13,
+        "e_write": 6.263065e-13
+      }
+    ]
+  },
+  "validation_4_v_dependence_direction": {
+    "description": "Direction and magnitude of e_read's V1->V8 dependence at each rate; where the trend flattens/reverses.",
+    "e_read_v1_to_v8_pct_change_by_rate": [
+      {
+        "R": 0.0,
+        "pct_change": -14.368,
+        "direction": "FALLS"
+      },
+      {
+        "R": 0.25,
+        "pct_change": -8.814,
+        "direction": "FALLS (smaller)"
+      },
+      {
+        "R": 0.5,
+        "pct_change": -4.231,
+        "direction": "FALLS (smaller still)"
+      },
+      {
+        "R": 1.0,
+        "pct_change": 2.823,
+        "direction": "RISES"
+      }
+    ],
+    "honest_finding": [
+      "The fall shrinks monotonically as VCSwitchRate rises from 0 to 1, but does NOT reverse until somewhere between R=0.5 and R=1.0 -- linear interpolation between the two puts the zero-crossing at approximately R~=0.80. This means the original task's blanket expectation 'at VCSwitchRate > 0, e_read must no longer FALL with V' is NOT fully met at R=0.25 or R=0.5 in this sweep -- both still show a real (smaller) net fall from V=1 to V=8. Only R=1.0 shows a net rise. Reported exactly as measured rather than claiming compliance at every R>0."
+    ],
+    "e_write_v1_to_v8_for_reference": {
+      "R=0.0": "+1.60%",
+      "R=1.0": "+1.77%",
+      "note": "e_write already rises with V at every rate (dominated by the data path, not the address bus), so it never exhibited the original artifact and needs no separate direction analysis."
+    }
+  },
+  "validation_5_v1_unaffected_check": {
+    "description": "Original expectation: with one VC there are no vc_id bits and no VC switching, so all four rates must give identical numbers at V=1; if they differ, the vc_id bit count is being computed wrongly.",
+    "result": "FAILS AS LITERALLY STATED -- V=1 numbers DO differ across VCSwitchRate (e_read: 3.032e-13 at R=0 vs 3.909e-13 at R=1.0, a 28.9% spread), but the STATED DIAGNOSTIC ('the vc_id bit count is being computed wrongly') is DISPROVEN, not confirmed.",
+    "vc_id_bit_count_independently_verified": {
+      "V=1, R=0.0": {
+        "idx_bits": 4,
+        "addr_bits": 4,
+        "vc_id_bits": 0
+      },
+      "V=1, R=1.0": {
+        "idx_bits": 4,
+        "addr_bits": 4,
+        "vc_id_bits": 0
+      },
+      "conclusion": "vc_id_bits = addr_bits - idx_bits = 0 at V=1 for BOTH rates, exactly as expected. The bit count is computed correctly."
+    },
+    "actual_cause": [
+      "The closed-form formula (kept exactly as specified, per this turn's decision) applies VCSwitchRate to INDEX bits too, not only vc_id bits: q = (1-p)*(1/pow(2,i+1)) + p*0.5 for every b < idx_bits. V=1 still has idx_bits=4 index bits (just zero vc_id bits), so its e_read/e_write genuinely, correctly move with VCSwitchRate via the index-bit term alone. This is a direct, by-design consequence of keeping the formula unmodified -- not a bug, and not evidence of a miscounted vc_id_bits. The original item 5's diagnostic hypothesis (attributing any V=1 sensitivity to a bit-count bug) does not hold; V=1 sensitivity to VCSwitchRate is expected and by design given the formula as specified."
+    ]
+  },
+  "validation_6_new_search_for_same_pattern": {
+    "description": "Searched the rest of the tree for the same flat-replication pattern: any propagatePortTransitionInfo() call that copies a single aggregate TransitionInfo from a multi-bit source port onto a multi-bit destination. Not fixed -- enumerated only, per instruction.",
+    "method": "Full grep of propagatePortTransitionInfo across model/ (over 150 call sites), cross-referenced against every multi-bit createOutputPort(..., makeNetIndex(...)) declaration, then manually inspected each candidate's actual per-bit vs. aggregate sourcing.",
+    "confirmed_occurrence": {
+      "file": "model/electrical/router/FIFOControl.cc",
+      "lines": "532-533",
+      "code": "propagatePortTransitionInfo(\"WRIdx\", (ElectricalModel*)getSubInstance(\"WRIdx_DFF0\"), \"Q\"); propagatePortTransitionInfo(\"RDIdx\", (ElectricalModel*)getSubInstance(\"RDIdx_DFF0\"), \"Q\");",
+      "explanation": "WRIdx/RDIdx are declared as idx_bits-wide multi-bit output ports (createOutputPort with makeNetIndex(0, idx_bits-1)) but their TransitionInfo is always taken from bit 0 (WRIdx_DFF0/RDIdx_DFF0) only, regardless of idx_bits. This is the PRODUCER-side root of the exact artifact just fixed on RouterInputPort's consumer side -- RouterInputPort no longer reads this aggregate value, but FIFOControl's own WRIdx/RDIdx ports still only expose bit 0's activity. Already self-documented in FIFOControl's own existing code comment acknowledging the limitation ('a single port can only carry one aggregate TransitionInfo'). Any OTHER future consumer of these ports (besides RouterInputPort, which now bypasses them for the address bus) would reproduce the same overcharge/undercharge artifact."
+    },
+    "crossbar_and_allocator_paths_checked_specifically": {
+      "files_checked": [
+        "model/electrical/MultiplexerCrossbar.cc",
+        "model/electrical/Multiplexer.cc",
+        "model/electrical/MatrixArbiter.cc",
+        "model/electrical/SeparableAllocator.cc",
+        "model/electrical/router/RouterSwitchAllocator.cc",
+        "model/electrical/Decoder.cc"
+      ],
+      "result": "NOT FOUND -- every multi-bit Sel/Grant/Request/Addr propagation in these files sources per-bit correctly (the loop index varies on BOTH the source and destination port name in every case checked, e.g. Multiplexer.cc's propagatePortTransitionInfo(mux0, \"Sel\"+i, \"Sel\"+i) and MatrixArbiter.cc's propagatePortTransitionInfo(\"Grant\"+i, g_and2s[i], \"Y\")). SeparableAllocator.cc and RouterSwitchAllocator.cc do not call propagatePortTransitionInfo() at all in their own propagateTransitionInfo() bodies (they delegate to sub-instance events/defaults), so the pattern cannot occur there. Reported as a genuine negative result, not assumed away just because the task suggested these files as likely candidates."
+    },
+    "lower_confidence_candidates_not_deeply_verified": [
+      {
+        "file": "model/electrical/BarrelShifter.cc",
+        "lines": "236-237",
+        "code": "propagatePortTransitionInfo(mux, \"In0\", \"In\"); propagatePortTransitionInfo(mux, \"In1\", \"In\");",
+        "note": "Same un-indexed source (\"In\", the model's multi-bit data input) feeding two sibling destination ports on the first shift stage. Could be architecturally correct (both paths genuinely originate from the same raw input at the very first stage) or could be the same pattern -- not deeply verified against BarrelShifter's exact semantics within the time available for this task. Flagged for a closer look, not confirmed as a bug."
+      }
+    ]
+  },
+  "implementation_status": "Unchanged from the prior turn: formula implemented exactly as specified, in model/electrical/router/RouterInputPort.cc propagateTransitionInfo(), no special-casing added. The reasoning above is now recorded as an expanded code comment at the same location."
+}

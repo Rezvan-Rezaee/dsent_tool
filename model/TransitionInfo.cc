@@ -23,8 +23,11 @@
 
 namespace DSENT
 {
+    // DSENT-ASSUMPTION: m_frequency_multiplier_ is hardcoded to 1.0 instead of
+    // derived as 00+2*01+11 (as the 3-arg ctor does). Consistent today
+    // (0.25+2*0.25+0.25=1.0) but will silently diverge if defaults change.
     TransitionInfo::TransitionInfo()
-        : m_number_transitions_00_(0.25), m_number_transitions_01_(0.25), 
+        : m_number_transitions_00_(0.25), m_number_transitions_01_(0.25),
         m_number_transitions_11_(0.25), m_frequency_multiplier_(1.0)
     {
         update();

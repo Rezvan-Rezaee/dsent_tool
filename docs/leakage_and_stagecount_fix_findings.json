@@ -1,0 +1,1290 @@
+{
+  "task": "Diagnose and fix leakage blowup + stage-count/discrete-size mismatch in 7FinFET.txt runs",
+  "constraints_honored": [
+    "Area: Area->Active only, never summed with Metal1Wire (unchanged; not touched).",
+    "Energy: C*Vdd^2 per 0->1 transition, no 1/2 factor (unchanged; not touched).",
+    "RouterInputPort.cc and all energy-model code: not touched.",
+    "DFFRAM.cc's per-bit D/CK portConnect loops: not touched (only the anonymous-namespace sizing/stage-count helpers and the 3 call sites that read their result were changed).",
+    "libutil/Config.cc: not modified.",
+    "No shipped DEFAULT parameter VALUE changed (EnableStages/EnableTaper/RowClockStages/RowClockTaper defaults unchanged; only the internal capping logic that computeChainStages applies to whatever value -- default or explicit -- was added).",
+    "All temporary instrumentation (main.cpp's dffram_diag tool) reverted via `git checkout -- main.cpp`; verified 0 matches for dffram_diag/runDffRamDiag in the restored file.",
+    "git status confirmed clean except the intended changes: .gitignore, tech/tech_models/7FinFET.txt, model/electrical/DFFRAM.cc."
+  ],
+  "part0_tech_file_identity": {
+    "identity_confirmed": "tech/tech_models/7FinFET.txt: Name=FinFET7LVT, Vdd=0.7, Temperature=340 (line 3,4,7) -- matches the ASAP7-calibrated file described in the task.",
+    "byte_identity_to_original": "NOT identical -- this task edits Nmos/Pmos->SubthresholdTempSwing (lines 80-81) from 2.3/2.3 to 71.4/59.7. See part3 for the full diff and justification.",
+    "tech_models_inventory": [
+      {
+        "file": "tech/tech_models/7FinFET.txt",
+        "name_field": "FinFET7LVT",
+        "tracked_before_this_task": false,
+        "tracked_after_this_task": "visible to git (untracked '??', not yet git-add'ed -- gitignore fix makes it trackable; the task did not ask to stage/commit it)"
+      },
+      {
+        "file": "tech/tech_models/Bulk22LVT.model",
+        "name_field": "Bulk22LVT",
+        "tracked": true
+      },
+      {
+        "file": "tech/tech_models/Bulk32LVT.model",
+        "name_field": "Bulk32LVT",
+        "tracked": true
+      },
+      {
+        "file": "tech/tech_models/Bulk45LVT.model",
+        "name_field": "Bulk45LVT",
+        "tracked": true
+      },
+      {
+        "file": "tech/tech_models/Photonics.model",
+        "name_field": "(no Name field)",
+        "tracked": true
+      },
+      {
+        "file": "tech/tech_models/TG11LVT.model",
+        "name_field": "TG11LVT",
+        "tracked": true
+      }
+    ],
+    "gitignore_fix": {
+      "problem": ".gitignore's blanket '*.txt' rule silently hid tech/tech_models/7FinFET.txt from git despite it being a real, versionable technology file.",
+      "minimal_change": "Inserted a single negation line '!tech/tech_models/*.txt' between the existing '*.txt' and '*.md' lines.",
+      "diff": "--- a/.gitignore\n+++ b/.gitignore\n@@ -1,3 +1,4 @@\n-*.o\n-*.txt\n+*.o\n+*.txt\n+!tech/tech_models/*.txt\n *.md\n\\ No newline at end of file",
+      "verification": "git status --porcelain -- tech/tech_models/7FinFET.txt now shows '?? tech/tech_models/7FinFET.txt' (previously invisible). No other ignore behavior changed -- confirmed docs/*.txt files remain ignored and already-tracked files are unaffected (gitignore never applies retroactively to tracked paths)."
+    }
+  },
+  "part1_leakage_formula_trace": {
+    "call_chain": [
+      "model/std_cells/CellMacros.cc:98 -- e.g. tech->calculateNmosLeakageCurrent(1, nmos_width, 0x0) for a single-transistor (num_stacks=1) BUF/INV-style cell's leakage; analogous calculatePmosLeakageCurrent(2, pmos_width, ~0x1) calls at lines 99-101 for stacked (NAND/NOR) cells.",
+      "tech/TechModel.cc:94-120 -- TechModel::calculateNmosLeakageCurrent(num_stacks_, stacked_mos_widths_, input_vector_)",
+      "tech/TechModel.cc:129-155 -- TechModel::calculatePmosLeakageCurrent (structurally identical to the Nmos version, but see the documented bug below)",
+      "tech/TechModel.cc:159-270 -- TechModel::calculateLeakageCurrentFactor(num_stacks_, stacked_mos_widths_, input_vector_, vdd_, subthreshold_swing_, dibl_swing_) -- stacked-transistor tri-diagonal solver for internal node voltages, used by both Nmos/Pmos callers to get the DIBL/Vgs leakage exponent."
+    ],
+    "temperature_scaling_expression": {
+      "citation": "tech/TechModel.cc:117 (Nmos) / :152 (Pmos)",
+      "quote": "double leakage_current = leakage_current_char_tmp * std::pow(10.0, (temp - char_temp) / temp_swing);",
+      "meaning": "leakage scales by 10^((Temperature - CharacterizedTemperature) / SubthresholdTempSwing) -- a decade of extra leakage for every SubthresholdTempSwing kelvin above CharacterizedTemperature."
+    },
+    "dibl_vdd_scaling_expression": {
+      "citation": "tech/TechModel.cc:266 (final leakage_current_factor), computed inside calculateLeakageCurrentFactor using dibl_swing_ = subthreshold_swing / dibl (TechModel.cc:107,142)",
+      "quote": "double leakage_current_factor = vgs/s1 + (vds - vdd_)/s2;   // s2 == dibl_swing_",
+      "single_transistor_note": "For num_stacks_==1 (every plain BUF/INV/DFFQ leakage query in this codebase), the early-exit at TechModel.cc:204-207 sets the internal node voltage v[1]=vdd_ directly, so vds==vdd_ exactly and the DIBL term (vds-vdd_)/s2 is identically 0 -- DIBL only has a nonzero effect for stacked (NAND2/NOR2, num_stacks>=2) leakage queries."
+    },
+    "min_off_current_application": {
+      "citation": "tech/TechModel.cc:114 (Nmos) / :149 (Pmos)",
+      "quote": "leakage_current_char_tmp = std::max(min_off_current, leakage_current_char_tmp);",
+      "classification": "FLOOR, not a ceiling and not additive -- MinOffCurrent only raises the characterized-temperature current if width*OffCurrent*10^leakage_current_factor would otherwise fall below it; it never caps or adds to a larger value."
+    },
+    "pmos_temp_swing_bug_discovered_not_fixed": {
+      "citation": "tech/TechModel.cc:139",
+      "quote": "double temp_swing = get(\"Nmos->SubthresholdTempSwing\");   // BUG: inside calculatePmosLeakageCurrent, should read \"Pmos->SubthresholdTempSwing\"",
+      "status": "NOT fixed -- out of scope per the explicit constraint against touching energy-model code beyond the sizing/stage-count files this task targets. TechModel.cc is not DFFRAM.cc, and this specific line is core leakage-model code the task's constraints instruct to leave alone.",
+      "empirical_confirmation": "Changing Pmos->SubthresholdTempSwing from 59.7 to 999.0 in a scratch copy produced a bit-identical DFFRAM leakage result (2.3808550861e-04 W both times, at the pre-Part-4-fix stage count) -- confirming the field is currently read-but-unused for Pmos leakage, since line 139 substitutes the Nmos value instead.",
+      "practical_impact_on_this_task": "Because of this bug, only Nmos->SubthresholdTempSwing (71.4) is actually load-bearing for BOTH Nmos and Pmos leakage today. Pmos->SubthresholdTempSwing was still corrected to its true extracted value (59.7, see part3) for correctness/documentation and in case the bug is fixed in a future task, but it has zero effect on any number reported in this deliverable."
+    },
+    "tech_file_parameters_in_leakage_path": [
+      {
+        "param": "Vdd",
+        "units": "V",
+        "role": "characterized/operating supply, used both as the leakage-factor's vdd_ and vds reference"
+      },
+      {
+        "param": "Temperature",
+        "units": "K",
+        "role": "operating temperature for the temp-scaling term"
+      },
+      {
+        "param": "Nmos/Pmos->CharacterizedTemperature",
+        "units": "K",
+        "role": "reference temperature the OffCurrent/MinOffCurrent constants were characterized at"
+      },
+      {
+        "param": "Nmos/Pmos->CharacterizedVdd",
+        "units": "V",
+        "role": "reference Vdd the OffCurrent constants were characterized at (read but not directly used in the leakage formula itself -- Vdd is used directly)"
+      },
+      {
+        "param": "Nmos/Pmos->OffCurrent",
+        "units": "A/m (per unit width)",
+        "role": "characterized-temperature/Vdd off-current density, multiplied by the transistor's width"
+      },
+      {
+        "param": "Nmos/Pmos->MinOffCurrent",
+        "units": "A (absolute)",
+        "role": "floor on the characterized-temperature current, see above"
+      },
+      {
+        "param": "Nmos/Pmos->SubthresholdSwing",
+        "units": "V/decade",
+        "role": "denominator of the Vgs leakage-factor term (s1) and numerator of dibl_swing_ (s2 = SubthresholdSwing/DIBL)"
+      },
+      {
+        "param": "Nmos/Pmos->DIBL",
+        "units": "V/V",
+        "role": "drain-induced-barrier-lowering coefficient; denominator of dibl_swing_"
+      },
+      {
+        "param": "Nmos/Pmos->SubthresholdTempSwing",
+        "units": "K/decade",
+        "role": "this task's fix target -- denominator of the temperature-scaling exponent"
+      }
+    ]
+  },
+  "part2_isolating_the_blowup": {
+    "config": "N=512, B=32, all 5 variants run under the current (Part-4-fixed) stage-count logic so structural (stage-count) effects are held constant across variants -- only tech-file leakage parameters differ between rows.",
+    "results_watts": {
+      "as_shipped_baseline_SubthresholdTempSwing_2.3": 16037191446000.0,
+      "temperature_300_equals_characterized": 6.5136370496e-05,
+      "subthreshold_temp_swing_30_temp_340": 0.0014033215414,
+      "both_changes_together": 6.5136370496e-05,
+      "bulk22lvt_reference": 0.029488888519,
+      "current_shipped_fixed_7FinFET (SubthresholdTempSwing=71.4/59.7, Temperature=340)": 0.00023661809849
+    },
+    "multiplicative_factor_removed": {
+      "by_temperature_300_fix": "1.6037191446e13 / 6.5136370496e-05 = 2.4626e17",
+      "by_swing_30_fix": "1.6037191446e13 / 1.4033215414e-03 = 1.1428e16",
+      "by_both": "same as temperature-300 alone = 2.4626e17 (once (T-Tchar)=0 the swing value is irrelevant -- 0/anything=0)",
+      "by_actual_extracted_fix_71.4": "1.6037191446e13 / 2.3661809849e-04 = 6.7778e16"
+    },
+    "dominant_parameter": "SubthresholdTempSwing (as shipped, 2.3 K/dec) accounts for essentially the entire blowup. Temperature itself (340K, only 40K above the 300K characterization point) is a completely ordinary, physically unremarkable value -- it is only catastrophic because it is divided by an unphysically small swing.",
+    "formula_check": {
+      "10_pow_40_over_2.3": 2.4620924014946406e+17,
+      "observed_ratio_baseline_over_temp300fix": 2.462094728932561e+17,
+      "match": "10^((340-300)/2.3) = 2.4626e17, matches the observed baseline/Temperature=300 ratio (2.4626e17) essentially exactly -- confirms the blowup is fully and only explained by this formula term."
+    },
+    "subthreshold_temp_swing_in_every_other_tech_file": {
+      "Bulk22LVT.model": "100 (Nmos and Pmos)",
+      "Bulk32LVT.model": "100 (Nmos and Pmos)",
+      "Bulk45LVT.model": "100 (Nmos and Pmos)",
+      "TG11LVT.model": "100 (Nmos and Pmos)",
+      "note": "7FinFET.txt's shipped value (2.3) was over 40x smaller than every other tech file in the repo -- the first strong signal (before Xyce extraction) that it was wrong, not merely a different node's physically-different value."
+    }
+  },
+  "part3_xyce_extraction": {
+    "deck_source": "/mnt/c/Users/rezva/Downloads/xyce/ (outside the git repo, on the user's own Windows filesystem, invoked from WSL via the full path to XyceNF_7.10's Xyce.exe). 05_nmos_temp.cir pre-existed from the user's own earlier calibration session; 09_pmos_temp.cir was authored this task (PMOS analog, same TEMP sweep and DC operating point, netlist polarity matched against the repo's own 02_pmos_sweep.cir/06_pmos_stack.cir conventions) and actually run through Xyce (not fabricated).",
+    "sweep_conditions": "Vgs=0, Vds=Vdd=0.7V, .STEP TEMP LIST 27 60 90 120 (degrees C -> 300.15/333.15/363.15/393.15 K) -- close to, though not exactly, the requested 300-400K nominal range; these were the operating points of the pre-existing NMOS deck this task's PMOS deck was made to match for a fair paired comparison.",
+    "nmos": {
+      "deck": "05_nmos_temp.cir",
+      "raw_sweep": [
+        {
+          "T_C": 27,
+          "T_K": 300.15,
+          "I_A": 2.36253007e-10
+        },
+        {
+          "T_C": 60,
+          "T_K": 333.15,
+          "I_A": 8.12848289e-10
+        },
+        {
+          "T_C": 90,
+          "T_K": 363.15,
+          "I_A": 2.09917555e-09
+        },
+        {
+          "T_C": 120,
+          "T_K": 393.15,
+          "I_A": 4.74124855e-09
+        }
+      ],
+      "fit": {
+        "model": "log10(I) = slope*T_K + intercept",
+        "slope_decades_per_K": 0.01400212,
+        "intercept": -13.794006,
+        "SubthresholdTempSwing_K_per_dec": 71.4177,
+        "R2": 0.994703
+      }
+    },
+    "pmos": {
+      "deck": "09_pmos_temp.cir (authored this task)",
+      "raw_sweep": [
+        {
+          "T_C": 27,
+          "T_K": 300.15,
+          "I_A": 2.25150025e-10
+        },
+        {
+          "T_C": 60,
+          "T_K": 333.15,
+          "I_A": 9.96958568e-10
+        },
+        {
+          "T_C": 90,
+          "T_K": 363.15,
+          "I_A": 3.0953034e-09
+        },
+        {
+          "T_C": 120,
+          "T_K": 393.15,
+          "I_A": 8.14478873e-09
+        }
+      ],
+      "fit": {
+        "model": "log10(I) = slope*T_K + intercept",
+        "slope_decades_per_K": 0.01675111,
+        "intercept": -14.631153,
+        "SubthresholdTempSwing_K_per_dec": 59.6975,
+        "R2": 0.994229
+      }
+    },
+    "tech_file_update_applied": {
+      "file": "tech/tech_models/7FinFET.txt",
+      "diff": "@@ -78,5 +78,5 @@\n # DIBL factor (V/V)\n Nmos->DIBL = 2.8600e-02\n Pmos->DIBL = 3.9100e-02\n-Nmos->SubthresholdTempSwing = 2.3000e+00\n-Pmos->SubthresholdTempSwing = 2.3000e+00\n+Nmos->SubthresholdTempSwing = 7.1400e+01\n+Pmos->SubthresholdTempSwing = 5.9700e+01"
+    },
+    "leakage_at_four_points_post_fix_watts": {
+      "note": "measured under the current (Part-4-fixed) stage-count logic",
+      "4_32": {
+        "7FinFET_fixed": 1.830137015e-06
+      },
+      "64_128": {
+        "7FinFET_fixed": 0.00012500404025
+      },
+      "512_32": {
+        "7FinFET_fixed": 0.00023661809849
+      },
+      "512_256": {
+        "7FinFET_fixed": 0.001813938917
+      }
+    },
+    "bulk22lvt_reference_for_comparison_watts": {
+      "512_32": 0.029488888519
+    },
+    "plausibility_verdict": "PHYSICALLY PLAUSIBLE. Post-fix 7FinFET leakage is in the 1.8uW-1.8mW range across the four points -- squarely in the same order-of-magnitude family as Bulk22LVT.model's mW-range reference (2.9e-2 W at 512,32), a completely different (older, higher-leakage bulk) node, whereas the as-shipped value (1.6e13 W at 512,32) was off by roughly 17 orders of magnitude. 7FinFET reads consistently LOWER than Bulk22LVT at every point, which is directionally correct for a modern low-leakage FinFET LVT cell relative to an older 22nm bulk process.",
+    "other_leakage_parameters_verification": {
+      "method": "re-ran the user's own extract.py against the existing 01/02/03/04/06/08 decks (all pre-existing, unmodified by this task)",
+      "result": "Nmos/Pmos OffCurrent, MinOffCurrent, SubthresholdSwing, DIBL all matched the shipped 7FinFET.txt values EXACTLY (e.g. Nmos->OffCurrent extracted=8.7501e-03 vs shipped=8.7501e-03). SubthresholdTempSwing was the ONLY parameter in the leakage path that was wrong. No other tech-file leakage parameter was changed."
+    }
+  },
+  "part4_compute_chain_stages_fix": {
+    "verbatim_original_implementation": "unsigned int computeChainStages(unsigned int count_, unsigned int stages_param_, double taper_)\n{\n    if(taper_ <= 0.0)\n    {\n        return 0;\n    }\n    if(stages_param_ > 0)\n    {\n        return stages_param_;\n    }\n    return std::max((unsigned int)1, (unsigned int)ceil(log((double)count_) / log(taper_)));\n}",
+    "rule_implemented": "Stage count (whether from the auto ceil(log(count)/log(taper)) formula, or from an explicit *Stages override) is capped at a new computeAchievableStages(final_load_, taper_, cache_, sizes_) bound: the number of stages produced by simulating sizeBufChain()'s own backward walk (target /= taper each step, pick the largest available discrete size <= target) and stopping the count the instant a stage would land on the smallest available size (index 0) -- because every stage beyond that point can only ever land on index 0 again too (dividing an already-floored capacitance by taper again clears nothing bigger), which is exactly the ratio-1.0 padding condition being eliminated. The cap is applied at CONSTRUCT time (not just at sizing time) so the excess stage is never built into the timing graph at all, not built-then-detected. Verified safe to read the StdCellLib cache at construct time: DSENT.cc's constructTechModel() builds StdCellLib (which synchronously populates its cache in its own constructor, StdCellLib.cc:39) before any model, including DFFRAM, is ever construct()'d (DSENT.cc:309 precedes :330's buildModel() call).",
+    "why": "The discrete AvailableSizes list (7 entries: [1,2,4,6,8,12,16] for 7FinFET.txt) can only support a limited number of DISTINCT size steps between a chain's starting load and its floor. The old formula assumed a continuous size range and could request more stages than that -- every excess stage got clamped to the smallest available size by sizeBufChain(), producing a chain with one or more adjacent stages at IDENTICAL (minimum) size: a drive-strength ratio of exactly 1.0 between them, i.e. a stage that adds intrinsic gate delay with zero sizing/taper benefit whatsoever.",
+    "assertion_added": {
+      "location": "model/electrical/DFFRAM.cc, inside sizeBufChain(), right after each stage's size is chosen",
+      "quote": "ASSERT(!((chosen_idx == 0) && (prev_chosen_idx == 0)), \"[Error] sizeBufChain -> chain contains a ratio-1.0 padding stage (two adjacent stages both clamped to the minimum available size). computeChainStages() should have capped the stage count before this point -- its achievable-stage bound is out of sync with this function.\");",
+      "verification_the_assert_actually_fires": "Temporarily disabled ONLY the new cap (computeChainStages returning the uncapped 'requested' count) while keeping the ASSERT live, then re-ran all 4 canonical points -- the ASSERT fired and aborted the process at every single one of them, proving the assertion genuinely detects the exact defect the cap is designed to prevent. Restored the real fix afterward and confirmed the restored file is byte-identical to the pre-test backup."
+    },
+    "before_after_four_points": {
+      "note": "before = cap AND assert both disabled (to capture raw padded numbers without crashing); after = the real, shipped fix (cap + live assert). Both measured with the leakage fix already in place, EnableStages=0/EnableTaper=4/RowClockStages=0/RowClockTaper=4 (auto, shipped defaults) at all points.",
+      "4_32": {
+        "before": {
+          "enable_stage_idx": [
+            1
+          ],
+          "enable_stage_val": [
+            2
+          ],
+          "row0_stage_idx": [
+            0,
+            0,
+            3
+          ],
+          "row0_stage_val": [
+            1,
+            1,
+            6
+          ],
+          "ratio_1_stage_count": 1,
+          "t_write_clock_path": 7.137636677e-11,
+          "area_active": 4.229658e-11,
+          "leak": 1.841556549e-06
+        },
+        "after": {
+          "enable_stage_idx": [
+            1
+          ],
+          "enable_stage_val": [
+            2
+          ],
+          "row0_stage_idx": [
+            0,
+            3
+          ],
+          "row0_stage_val": [
+            1,
+            6
+          ],
+          "ratio_1_stage_count": 0,
+          "t_write_clock_path": 6.0770475534e-11,
+          "area_active": 4.212162e-11,
+          "leak": 1.830137015e-06
+        },
+        "delay_improvement": "10.606ps faster (7.1376e-11 -> 6.0770e-11), from removing 1 padding stage on the row-clock chain."
+      },
+      "64_128": {
+        "before": {
+          "enable_stage_idx": [
+            0,
+            2,
+            6
+          ],
+          "enable_stage_val": [
+            1,
+            4,
+            16
+          ],
+          "row0_stage_idx": [
+            0,
+            0,
+            2,
+            6
+          ],
+          "row0_stage_val": [
+            1,
+            1,
+            4,
+            16
+          ],
+          "ratio_1_stage_count": 1,
+          "t_write_clock_path": 1.1436538048e-10,
+          "area_active": 2.78877492e-09,
+          "leak": 0.00012518675279
+        },
+        "after": {
+          "enable_stage_idx": [
+            0,
+            2,
+            6
+          ],
+          "enable_stage_val": [
+            1,
+            4,
+            16
+          ],
+          "row0_stage_idx": [
+            0,
+            2,
+            6
+          ],
+          "row0_stage_val": [
+            1,
+            4,
+            16
+          ],
+          "ratio_1_stage_count": 0,
+          "t_write_clock_path": 1.0375948925e-10,
+          "area_active": 2.78597556e-09,
+          "leak": 0.00012500404025
+        },
+        "delay_improvement": "10.606ps faster, from removing 1 padding stage on the row-clock chain."
+      },
+      "512_32": {
+        "before": {
+          "enable_stage_idx": [
+            0,
+            0,
+            0,
+            2,
+            6
+          ],
+          "enable_stage_val": [
+            1,
+            1,
+            1,
+            4,
+            16
+          ],
+          "row0_stage_idx": [
+            0,
+            0,
+            3
+          ],
+          "row0_stage_val": [
+            1,
+            1,
+            6
+          ],
+          "ratio_1_stage_count": 3,
+          "t_write_clock_path": 1.8974955932e-10,
+          "area_active": 5.53348908e-09,
+          "leak": 0.00023808550861
+        },
+        "after": {
+          "enable_stage_idx": [
+            0,
+            2,
+            6
+          ],
+          "enable_stage_val": [
+            1,
+            4,
+            16
+          ],
+          "row0_stage_idx": [
+            0,
+            3
+          ],
+          "row0_stage_val": [
+            1,
+            6
+          ],
+          "ratio_1_stage_count": 0,
+          "t_write_clock_path": 1.5793188561e-10,
+          "area_active": 5.51100672e-09,
+          "leak": 0.00023661809849
+        },
+        "delay_improvement": "31.82ps faster (1.8975e-10 -> 1.5793e-10): removes 2 padding stages on the enable chain plus 1 on the row-clock chain."
+      },
+      "512_256": {
+        "before": {
+          "enable_stage_idx": [
+            0,
+            0,
+            0,
+            2,
+            6
+          ],
+          "enable_stage_val": [
+            1,
+            1,
+            1,
+            4,
+            16
+          ],
+          "row0_stage_idx": [
+            0,
+            0,
+            2,
+            6
+          ],
+          "row0_stage_val": [
+            1,
+            1,
+            4,
+            16
+          ],
+          "ratio_1_stage_count": 3,
+          "t_write_clock_path": 2.0804847643e-10,
+          "area_active": 4.30155198e-08,
+          "leak": 0.0018154063272
+        },
+        "after": {
+          "enable_stage_idx": [
+            0,
+            2,
+            6
+          ],
+          "enable_stage_val": [
+            1,
+            4,
+            16
+          ],
+          "row0_stage_idx": [
+            0,
+            2,
+            6
+          ],
+          "row0_stage_val": [
+            1,
+            4,
+            16
+          ],
+          "ratio_1_stage_count": 0,
+          "t_write_clock_path": 1.7623080272e-10,
+          "area_active": 4.299303744e-08,
+          "leak": 0.001813938917
+        },
+        "delay_improvement": "31.82ps faster, same mechanism as 512,32."
+      }
+    },
+    "regression_testing": "Full EnableStages(1-6) x EnableTaper(1.0-6) x RowClockStages(1-6) x RowClockTaper(1.0-6) grids at all 4 canonical points (216+216 runs), plus a per-N x taper grid (8 N values x 54 combos = 432 runs), plus edge-extension probes (taper up to 24, direct-connect boundary) -- 864+124 = 988 total dffram_diag invocations under the fixed build -- returned ZERO ASSERT failures / zero errors, confirming the cap holds across a far wider space than just the 4 canonical default-parameter points."
+  },
+  "part5_resweep_under_both_fixes": {
+    "objective_metric": "t_write_clock_path (write-clock delay, CK net to DFF CK pin), argmin -- same metric convention as the immediately-preceding task's own EnableFanout sweep (docs/enable_buf_taper_fix_findings.json).",
+    "enable_stages_x_taper_grid": {
+      "4,32": {
+        "argmin_stages": 1,
+        "argmin_taper": 2,
+        "argmin_delay": 6.0132996388e-11,
+        "interior": false,
+        "on_stage_edge": true,
+        "on_taper_edge": false,
+        "full_table": {
+          "1": {
+            "1.0": 6.2384012469e-11,
+            "1.2": 6.2384012469e-11,
+            "1.4": 6.1093209338e-11,
+            "1.5": 6.1093209338e-11,
+            "2": 6.0132996388e-11,
+            "2.5": 6.0132996388e-11,
+            "3": 6.0770475534e-11,
+            "4": 6.0770475534e-11,
+            "6": 6.4959353692e-11
+          },
+          "2": {
+            "1.0": 7.2645739494e-11,
+            "1.2": 7.1248689838e-11,
+            "1.4": 7.0104474956e-11,
+            "1.5": 7.0104474956e-11,
+            "2": 6.9584026756e-11,
+            "2.5": 7.0738887624e-11,
+            "3": 7.137636677e-11,
+            "4": 7.137636677e-11,
+            "6": 6.4959353692e-11
+          },
+          "3": {
+            "1.0": 8.2907466519e-11,
+            "1.2": 8.0259955457e-11,
+            "1.4": 7.9555505324e-11,
+            "1.5": 7.9555505324e-11,
+            "2": 8.0189917992e-11,
+            "2.5": 7.0738887624e-11,
+            "3": 7.137636677e-11,
+            "4": 7.137636677e-11,
+            "6": 6.4959353692e-11
+          },
+          "4": {
+            "1.0": 9.3169193543e-11,
+            "1.2": 8.9710985825e-11,
+            "1.4": 9.016139656e-11,
+            "1.5": 9.016139656e-11,
+            "2": 8.0189917992e-11,
+            "2.5": 7.0738887624e-11,
+            "3": 7.137636677e-11,
+            "4": 7.137636677e-11,
+            "6": 6.4959353692e-11
+          },
+          "5": {
+            "1.0": 1.0343092057e-10,
+            "1.2": 1.0031687706e-10,
+            "1.4": 9.016139656e-11,
+            "1.5": 9.016139656e-11,
+            "2": 8.0189917992e-11,
+            "2.5": 7.0738887624e-11,
+            "3": 7.137636677e-11,
+            "4": 7.137636677e-11,
+            "6": 6.4959353692e-11
+          },
+          "6": {
+            "1.0": 1.1369264759e-10,
+            "1.2": 1.0031687706e-10,
+            "1.4": 9.016139656e-11,
+            "1.5": 9.016139656e-11,
+            "2": 8.0189917992e-11,
+            "2.5": 7.0738887624e-11,
+            "3": 7.137636677e-11,
+            "4": 7.137636677e-11,
+            "6": 6.4959353692e-11
+          }
+        }
+      },
+      "64,128": {
+        "argmin_stages": 1,
+        "argmin_taper": 1.0,
+        "argmin_delay": 9.0738803635e-11,
+        "interior": false,
+        "on_stage_edge": true,
+        "on_taper_edge": true,
+        "full_table": {
+          "1": {
+            "1.0": 9.0738803635e-11,
+            "1.2": 9.0738803635e-11,
+            "1.4": 9.0738803635e-11,
+            "1.5": 9.0738803635e-11,
+            "2": 9.0738803635e-11,
+            "2.5": 9.0738803635e-11,
+            "3": 9.0738803635e-11,
+            "4": 9.0738803635e-11,
+            "6": 9.0738803635e-11
+          },
+          "2": {
+            "1.0": 1.0100053066e-10,
+            "1.2": 9.7798533445e-11,
+            "1.4": 9.4843824168e-11,
+            "1.5": 9.4843824168e-11,
+            "2": 9.4843824168e-11,
+            "2.5": 9.3739951011e-11,
+            "3": 9.3153598012e-11,
+            "4": 9.3153598012e-11,
+            "6": 9.491265701e-11
+          },
+          "3": {
+            "1.0": 1.1126225768e-10,
+            "1.2": 1.0498190722e-10,
+            "1.4": 1.0253579554e-10,
+            "1.5": 1.0253579554e-10,
+            "2": 1.0253579554e-10,
+            "2.5": 1.0231145188e-10,
+            "3": 1.0375948925e-10,
+            "4": 1.0375948925e-10,
+            "6": 1.0551854825e-10
+          },
+          "4": {
+            "1.0": 1.2152398471e-10,
+            "1.2": 1.1384658459e-10,
+            "1.4": 1.1198682591e-10,
+            "1.5": 1.1198682591e-10,
+            "2": 1.1198682591e-10,
+            "2.5": 1.1291734312e-10,
+            "3": 1.0375948925e-10,
+            "4": 1.0375948925e-10,
+            "6": 1.0551854825e-10
+          },
+          "5": {
+            "1.0": 1.3178571173e-10,
+            "1.2": 1.2285785021e-10,
+            "1.4": 1.2259271714e-10,
+            "1.5": 1.2259271714e-10,
+            "2": 1.2259271714e-10,
+            "2.5": 1.1291734312e-10,
+            "3": 1.0375948925e-10,
+            "4": 1.0375948925e-10,
+            "6": 1.0551854825e-10
+          },
+          "6": {
+            "1.0": 1.4204743876e-10,
+            "1.2": 1.3230888058e-10,
+            "1.4": 1.2259271714e-10,
+            "1.5": 1.2259271714e-10,
+            "2": 1.2259271714e-10,
+            "2.5": 1.1291734312e-10,
+            "3": 1.0375948925e-10,
+            "4": 1.0375948925e-10,
+            "6": 1.0551854825e-10
+          }
+        }
+      },
+      "512,32": {
+        "argmin_stages": 1,
+        "argmin_taper": 1.0,
+        "argmin_delay": 1.449112e-10,
+        "interior": false,
+        "on_stage_edge": true,
+        "on_taper_edge": true,
+        "full_table": {
+          "1": {
+            "1.0": 1.449112e-10,
+            "1.2": 1.449112e-10,
+            "1.4": 1.449112e-10,
+            "1.5": 1.449112e-10,
+            "2": 1.449112e-10,
+            "2.5": 1.449112e-10,
+            "3": 1.449112e-10,
+            "4": 1.449112e-10,
+            "6": 1.449112e-10
+          },
+          "2": {
+            "1.0": 1.5517292702e-10,
+            "1.2": 1.5197092981e-10,
+            "1.4": 1.4901622053e-10,
+            "1.5": 1.4901622053e-10,
+            "2": 1.4901622053e-10,
+            "2.5": 1.4791234737e-10,
+            "3": 1.4732599437e-10,
+            "4": 1.4732599437e-10,
+            "6": 1.4908505337e-10
+          },
+          "3": {
+            "1.0": 1.6543465405e-10,
+            "1.2": 1.5915430358e-10,
+            "1.4": 1.567081919e-10,
+            "1.5": 1.567081919e-10,
+            "2": 1.567081919e-10,
+            "2.5": 1.5648384824e-10,
+            "3": 1.5793188561e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5969094461e-10
+          },
+          "4": {
+            "1.0": 1.7569638107e-10,
+            "1.2": 1.6801898095e-10,
+            "1.4": 1.6615922227e-10,
+            "1.5": 1.6615922227e-10,
+            "2": 1.6615922227e-10,
+            "2.5": 1.6708973948e-10,
+            "3": 1.5793188561e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5969094461e-10
+          },
+          "5": {
+            "1.0": 1.8595810809e-10,
+            "1.2": 1.7703024657e-10,
+            "1.4": 1.767651135e-10,
+            "1.5": 1.767651135e-10,
+            "2": 1.767651135e-10,
+            "2.5": 1.6708973948e-10,
+            "3": 1.5793188561e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5969094461e-10
+          },
+          "6": {
+            "1.0": 1.9621983512e-10,
+            "1.2": 1.8648127694e-10,
+            "1.4": 1.767651135e-10,
+            "1.5": 1.767651135e-10,
+            "2": 1.767651135e-10,
+            "2.5": 1.6708973948e-10,
+            "3": 1.5793188561e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5969094461e-10
+          }
+        }
+      },
+      "512,256": {
+        "argmin_stages": 1,
+        "argmin_taper": 1.0,
+        "argmin_delay": 1.6321011711e-10,
+        "interior": false,
+        "on_stage_edge": true,
+        "on_taper_edge": true,
+        "full_table": {
+          "1": {
+            "1.0": 1.6321011711e-10,
+            "1.2": 1.6321011711e-10,
+            "1.4": 1.6321011711e-10,
+            "1.5": 1.6321011711e-10,
+            "2": 1.6321011711e-10,
+            "2.5": 1.6321011711e-10,
+            "3": 1.6321011711e-10,
+            "4": 1.6321011711e-10,
+            "6": 1.6321011711e-10
+          },
+          "2": {
+            "1.0": 1.7347184413e-10,
+            "1.2": 1.7026984692e-10,
+            "1.4": 1.6731513764e-10,
+            "1.5": 1.6731513764e-10,
+            "2": 1.6731513764e-10,
+            "2.5": 1.6621126449e-10,
+            "3": 1.6562491149e-10,
+            "4": 1.6562491149e-10,
+            "6": 1.6738397048e-10
+          },
+          "3": {
+            "1.0": 1.8373357116e-10,
+            "1.2": 1.774532207e-10,
+            "1.4": 1.7500710901e-10,
+            "1.5": 1.7500710901e-10,
+            "2": 1.7500710901e-10,
+            "2.5": 1.7478276536e-10,
+            "3": 1.7623080272e-10,
+            "4": 1.7623080272e-10,
+            "6": 1.7798986172e-10
+          },
+          "4": {
+            "1.0": 1.9399529818e-10,
+            "1.2": 1.8631789807e-10,
+            "1.4": 1.8445813938e-10,
+            "1.5": 1.8445813938e-10,
+            "2": 1.8445813938e-10,
+            "2.5": 1.8538865659e-10,
+            "3": 1.7623080272e-10,
+            "4": 1.7623080272e-10,
+            "6": 1.7798986172e-10
+          },
+          "5": {
+            "1.0": 2.0425702521e-10,
+            "1.2": 1.9532916369e-10,
+            "1.4": 1.9506403062e-10,
+            "1.5": 1.9506403062e-10,
+            "2": 1.9506403062e-10,
+            "2.5": 1.8538865659e-10,
+            "3": 1.7623080272e-10,
+            "4": 1.7623080272e-10,
+            "6": 1.7798986172e-10
+          },
+          "6": {
+            "1.0": 2.1451875223e-10,
+            "1.2": 2.0478019405e-10,
+            "1.4": 1.9506403062e-10,
+            "1.5": 1.9506403062e-10,
+            "2": 1.9506403062e-10,
+            "2.5": 1.8538865659e-10,
+            "3": 1.7623080272e-10,
+            "4": 1.7623080272e-10,
+            "6": 1.7798986172e-10
+          }
+        }
+      }
+    },
+    "rowclock_stages_x_taper_grid": {
+      "4,32": {
+        "argmin_stages": 1,
+        "argmin_taper": 4,
+        "argmin_delay": 5.0164584298e-11,
+        "interior": false,
+        "on_stage_edge": true,
+        "on_taper_edge": false,
+        "full_table": {
+          "1": {
+            "1.0": 5.665427751e-11,
+            "1.2": 5.665427751e-11,
+            "1.4": 5.665427751e-11,
+            "1.5": 5.665427751e-11,
+            "2": 5.3606457583e-11,
+            "2.5": 5.096010288e-11,
+            "3": 5.096010288e-11,
+            "4": 5.0164584298e-11,
+            "6": 5.0194940448e-11
+          },
+          "2": {
+            "1.0": 6.6916004535e-11,
+            "1.2": 6.371400732e-11,
+            "1.4": 6.0759298043e-11,
+            "1.5": 6.0759298043e-11,
+            "2": 5.9539369955e-11,
+            "2.5": 5.8652074251e-11,
+            "3": 5.8652074251e-11,
+            "4": 6.0770475534e-11,
+            "6": 6.0800831684e-11
+          },
+          "3": {
+            "1.0": 7.717773156e-11,
+            "1.2": 7.0897381099e-11,
+            "1.4": 6.8451269414e-11,
+            "1.5": 6.8451269414e-11,
+            "2": 6.8110870825e-11,
+            "2.5": 6.9257965486e-11,
+            "3": 6.9257965486e-11,
+            "4": 6.0770475534e-11,
+            "6": 6.0800831684e-11
+          },
+          "4": {
+            "1.0": 8.7439458585e-11,
+            "1.2": 7.9762058468e-11,
+            "1.4": 7.7902299782e-11,
+            "1.5": 7.7902299782e-11,
+            "2": 7.871676206e-11,
+            "2.5": 6.9257965486e-11,
+            "3": 6.9257965486e-11,
+            "4": 6.0770475534e-11,
+            "6": 6.0800831684e-11
+          },
+          "5": {
+            "1.0": 9.7701185609e-11,
+            "1.2": 8.8773324086e-11,
+            "1.4": 8.8508191017e-11,
+            "1.5": 8.8508191017e-11,
+            "2": 7.871676206e-11,
+            "2.5": 6.9257965486e-11,
+            "3": 6.9257965486e-11,
+            "4": 6.0770475534e-11,
+            "6": 6.0800831684e-11
+          },
+          "6": {
+            "1.0": 1.0796291263e-10,
+            "1.2": 9.8224354454e-11,
+            "1.4": 8.8508191017e-11,
+            "1.5": 8.8508191017e-11,
+            "2": 7.871676206e-11,
+            "2.5": 6.9257965486e-11,
+            "3": 6.9257965486e-11,
+            "4": 6.0770475534e-11,
+            "6": 6.0800831684e-11
+          }
+        }
+      },
+      "64,128": {
+        "argmin_stages": 1,
+        "argmin_taper": 1.0,
+        "argmin_delay": 9.0738803635e-11,
+        "interior": false,
+        "on_stage_edge": true,
+        "on_taper_edge": true,
+        "full_table": {
+          "1": {
+            "1.0": 9.0738803635e-11,
+            "1.2": 9.0738803635e-11,
+            "1.4": 9.0738803635e-11,
+            "1.5": 9.0738803635e-11,
+            "2": 9.0738803635e-11,
+            "2.5": 9.0738803635e-11,
+            "3": 9.0738803635e-11,
+            "4": 9.0738803635e-11,
+            "6": 9.0738803635e-11
+          },
+          "2": {
+            "1.0": 1.0100053066e-10,
+            "1.2": 9.7798533445e-11,
+            "1.4": 9.4843824168e-11,
+            "1.5": 9.4843824168e-11,
+            "2": 9.4843824168e-11,
+            "2.5": 9.3739951011e-11,
+            "3": 9.3153598012e-11,
+            "4": 9.3153598012e-11,
+            "6": 9.491265701e-11
+          },
+          "3": {
+            "1.0": 1.1126225768e-10,
+            "1.2": 1.0498190722e-10,
+            "1.4": 1.0253579554e-10,
+            "1.5": 1.0253579554e-10,
+            "2": 1.0253579554e-10,
+            "2.5": 1.0231145188e-10,
+            "3": 1.0375948925e-10,
+            "4": 1.0375948925e-10,
+            "6": 1.0551854825e-10
+          },
+          "4": {
+            "1.0": 1.2152398471e-10,
+            "1.2": 1.1384658459e-10,
+            "1.4": 1.1198682591e-10,
+            "1.5": 1.1198682591e-10,
+            "2": 1.1198682591e-10,
+            "2.5": 1.1291734312e-10,
+            "3": 1.0375948925e-10,
+            "4": 1.0375948925e-10,
+            "6": 1.0551854825e-10
+          },
+          "5": {
+            "1.0": 1.3178571173e-10,
+            "1.2": 1.2285785021e-10,
+            "1.4": 1.2259271714e-10,
+            "1.5": 1.2259271714e-10,
+            "2": 1.2259271714e-10,
+            "2.5": 1.1291734312e-10,
+            "3": 1.0375948925e-10,
+            "4": 1.0375948925e-10,
+            "6": 1.0551854825e-10
+          },
+          "6": {
+            "1.0": 1.4204743876e-10,
+            "1.2": 1.3230888058e-10,
+            "1.4": 1.2259271714e-10,
+            "1.5": 1.2259271714e-10,
+            "2": 1.2259271714e-10,
+            "2.5": 1.1291734312e-10,
+            "3": 1.0375948925e-10,
+            "4": 1.0375948925e-10,
+            "6": 1.0551854825e-10
+          }
+        }
+      },
+      "512,32": {
+        "argmin_stages": 1,
+        "argmin_taper": 4,
+        "argmin_delay": 1.4732599437e-10,
+        "interior": false,
+        "on_stage_edge": true,
+        "on_taper_edge": false,
+        "full_table": {
+          "1": {
+            "1.0": 1.5381568759e-10,
+            "1.2": 1.5381568759e-10,
+            "1.4": 1.5381568759e-10,
+            "1.5": 1.5381568759e-10,
+            "2": 1.5076786766e-10,
+            "2.5": 1.4812151295e-10,
+            "3": 1.4812151295e-10,
+            "4": 1.4732599437e-10,
+            "6": 1.4735635052e-10
+          },
+          "2": {
+            "1.0": 1.6407741461e-10,
+            "1.2": 1.6087541739e-10,
+            "1.4": 1.5792070812e-10,
+            "1.5": 1.5792070812e-10,
+            "2": 1.5670078003e-10,
+            "2.5": 1.5581348433e-10,
+            "3": 1.5581348433e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5796224176e-10
+          },
+          "3": {
+            "1.0": 1.7433914163e-10,
+            "1.2": 1.6805879117e-10,
+            "1.4": 1.6561267949e-10,
+            "1.5": 1.6561267949e-10,
+            "2": 1.652722809e-10,
+            "2.5": 1.6641937556e-10,
+            "3": 1.6641937556e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5796224176e-10
+          },
+          "4": {
+            "1.0": 1.8460086866e-10,
+            "1.2": 1.7692346854e-10,
+            "1.4": 1.7506370986e-10,
+            "1.5": 1.7506370986e-10,
+            "2": 1.7587817213e-10,
+            "2.5": 1.6641937556e-10,
+            "3": 1.6641937556e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5796224176e-10
+          },
+          "5": {
+            "1.0": 1.9486259568e-10,
+            "1.2": 1.8593473416e-10,
+            "1.4": 1.8566960109e-10,
+            "1.5": 1.8566960109e-10,
+            "2": 1.7587817213e-10,
+            "2.5": 1.6641937556e-10,
+            "3": 1.6641937556e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5796224176e-10
+          },
+          "6": {
+            "1.0": 2.0512432271e-10,
+            "1.2": 1.9538576453e-10,
+            "1.4": 1.8566960109e-10,
+            "1.5": 1.8566960109e-10,
+            "2": 1.7587817213e-10,
+            "2.5": 1.6641937556e-10,
+            "3": 1.6641937556e-10,
+            "4": 1.5793188561e-10,
+            "6": 1.5796224176e-10
+          }
+        }
+      },
+      "512,256": {
+        "argmin_stages": 1,
+        "argmin_taper": 1.0,
+        "argmin_delay": 1.6321011711e-10,
+        "interior": false,
+        "on_stage_edge": true,
+        "on_taper_edge": true,
+        "full_table": {
+          "1": {
+            "1.0": 1.6321011711e-10,
+            "1.2": 1.6321011711e-10,
+            "1.4": 1.6321011711e-10,
+            "1.5": 1.6321011711e-10,
+            "2": 1.6321011711e-10,
+            "2.5": 1.6321011711e-10,
+            "3": 1.6321011711e-10,
+            "4": 1.6321011711e-10,
+            "6": 1.6321011711e-10
+          },
+          "2": {
+            "1.0": 1.7347184413e-10,
+            "1.2": 1.7026984692e-10,
+            "1.4": 1.6731513764e-10,
+            "1.5": 1.6731513764e-10,
+            "2": 1.6731513764e-10,
+            "2.5": 1.6621126449e-10,
+            "3": 1.6562491149e-10,
+            "4": 1.6562491149e-10,
+            "6": 1.6738397048e-10
+          },
+          "3": {
+            "1.0": 1.8373357116e-10,
+            "1.2": 1.774532207e-10,
+            "1.4": 1.7500710901e-10,
+            "1.5": 1.7500710901e-10,
+            "2": 1.7500710901e-10,
+            "2.5": 1.7478276536e-10,
+            "3": 1.7623080272e-10,
+            "4": 1.7623080272e-10,
+            "6": 1.7798986172e-10
+          },
+          "4": {
+            "1.0": 1.9399529818e-10,
+            "1.2": 1.8631789807e-10,
+            "1.4": 1.8445813938e-10,
+            "1.5": 1.8445813938e-10,
+            "2": 1.8445813938e-10,
+            "2.5": 1.8538865659e-10,
+            "3": 1.7623080272e-10,
+            "4": 1.7623080272e-10,
+            "6": 1.7798986172e-10
+          },
+          "5": {
+            "1.0": 2.0425702521e-10,
+            "1.2": 1.9532916369e-10,
+            "1.4": 1.9506403062e-10,
+            "1.5": 1.9506403062e-10,
+            "2": 1.9506403062e-10,
+            "2.5": 1.8538865659e-10,
+            "3": 1.7623080272e-10,
+            "4": 1.7623080272e-10,
+            "6": 1.7798986172e-10
+          },
+          "6": {
+            "1.0": 2.1451875223e-10,
+            "1.2": 2.0478019405e-10,
+            "1.4": 1.9506403062e-10,
+            "1.5": 1.9506403062e-10,
+            "2": 1.9506403062e-10,
+            "2.5": 1.8538865659e-10,
+            "3": 1.7623080272e-10,
+            "4": 1.7623080272e-10,
+            "6": 1.7798986172e-10
+          }
+        }
+      }
+    },
+    "grid_argmin_edge_extension": {
+      "note": "Every point's argmin in the swept EnableStages(1-6) x EnableTaper(1.0-6) and RowClockStages(1-6) x RowClockTaper(1.0-6) grids landed at stages=1 (the low edge of the stages range) and taper on-or-near an edge. Extended taper up to 24 at stages=1 for all 4 points plus the full per-N sweep: NO point found a lower delay beyond taper=6-12, confirming the taper edges found were true local optima, not artifacts of a truncated sweep range.",
+      "extended_taper_probe_max_tested": 24,
+      "result": "no improvement beyond the original 1.0-6 range at any of the 4 canonical points or any of the 8 per-N points"
+    },
+    "direct_connect_boundary_IMPORTANT_FINDING": {
+      "what_was_tested": "stages=1 is not actually the true lower bound of the parameter space -- EnableTaper<=0 (or RowClockTaper<=0) disables the corresponding chain entirely ('0 stages', direct wire connection). This boundary was NOT included in the swept EnableStages{1..6} grid and was tested separately.",
+      "four_canonical_points": {
+        "4_32": {
+          "enable_grid_best": 6.0133e-11,
+          "rowclock_grid_best": 5.016458e-11,
+          "both_direct_connect": 4.6913515335e-11,
+          "winner": "BOTH CHAINS DISABLED beats both grids' stages=1 optimum"
+        },
+        "64_128": {
+          "enable_grid_best": 9.07388e-11,
+          "rowclock_grid_best": 9.07388e-11,
+          "both_direct_connect": 2.5512474929e-10,
+          "winner": "buffered (stages=1) wins decisively"
+        },
+        "512_32": {
+          "enable_grid_best": 1.449112e-10,
+          "rowclock_grid_best": 1.47326e-10,
+          "both_direct_connect": 1.2643548925e-09,
+          "winner": "buffered (stages=1) wins decisively"
+        },
+        "512_256": {
+          "enable_grid_best": 1.632101e-10,
+          "rowclock_grid_best": 1.632101e-10,
+          "both_direct_connect": 1.4146657649e-09,
+          "winner": "buffered (stages=1) wins decisively"
+        }
+      },
+      "per_n_direct_connect_crossover_B32": {
+        "4": 4.6913515335e-11,
+        "8": 5.6499667911e-11,
+        "16": 7.5671973063e-11,
+        "32": 1.1401658337e-10,
+        "64": 1.9070580397e-10
+      },
+      "per_n_buffered_best_for_comparison": {
+        "4": {
+          "stages": 1,
+          "taper": 2,
+          "delay": 6.0132996388e-11
+        },
+        "8": {
+          "stages": 1,
+          "taper": 4,
+          "delay": 6.2529534532e-11
+        },
+        "16": {
+          "stages": 1,
+          "taper": 6,
+          "delay": 6.5886285626e-11
+        },
+        "32": {
+          "stages": 1,
+          "taper": 6,
+          "delay": 7.1117574057e-11
+        },
+        "64": {
+          "stages": 1,
+          "taper": 1.0,
+          "delay": 7.7808131964e-11
+        },
+        "128": {
+          "stages": 1,
+          "taper": 1.0,
+          "delay": 8.739428454e-11
+        },
+        "256": {
+          "stages": 1,
+          "taper": 1.0,
+          "delay": 1.0656658969e-10
+        },
+        "512": {
+          "stages": 1,
+          "taper": 1.0,
+          "delay": 1.449112e-10
+        }
+      },
+      "crossover_point": "Between N=8 and N=16: at N=4 and N=8, disabling the buffer entirely (0 stages) beats the best buffered (stages=1) option found in the swept grid; from N=16 upward, buffered stages=1 wins and the margin grows sharply with N (e.g. at N=64, direct=1.907e-10s vs buffered=7.781e-11s -- buffered is 2.45x faster)."
+    },
+    "per_n_search": {
+      "grid": "stages in {1..6} x taper in {1.0,1.2,1.4,1.5,2,2.5,3,4,6}, N in {4,8,16,32,64,128,256,512}, B=32, EnableStages/EnableTaper only (RowClockStages/RowClockTaper held at shipped default 0/4 -- RowClock's own optimum doesn't move with N since B is fixed at 32 throughout this sweep)",
+      "selected_per_n": {
+        "4": {
+          "stages": 1,
+          "taper": 2,
+          "delay": 6.0132996388e-11
+        },
+        "8": {
+          "stages": 1,
+          "taper": 4,
+          "delay": 6.2529534532e-11
+        },
+        "16": {
+          "stages": 1,
+          "taper": 6,
+          "delay": 6.5886285626e-11
+        },
+        "32": {
+          "stages": 1,
+          "taper": 6,
+          "delay": 7.1117574057e-11
+        },
+        "64": {
+          "stages": 1,
+          "taper": 1.0,
+          "delay": 7.7808131964e-11
+        },
+        "128": {
+          "stages": 1,
+          "taper": 1.0,
+          "delay": 8.739428454e-11
+        },
+        "256": {
+          "stages": 1,
+          "taper": 1.0,
+          "delay": 1.0656658969e-10
+        },
+        "512": {
+          "stages": 1,
+          "taper": 1.0,
+          "delay": 1.449112e-10
+        }
+      },
+      "log2N_fit": {
+        "slope": 1.0533895901464284e-11,
+        "intercept": 2.6606897141571456e-11,
+        "r2": 0.8046899925625159
+      },
+      "fit_interpretation": "delay = 1.0534e-11 * log2(N) + 2.6607e-11, R^2=0.8047 -- a log-linear relationship holds reasonably well (R^2=0.80) but is NOT a tight fit, because the selected taper itself changes discontinuously across the sweep (see regime change below), which the single global linear fit does not capture."
+    },
+    "does_stages_1_still_win_everywhere": {
+      "answer": "NO -- it does not win everywhere, and this is a genuine finding, not an artifact. Restricting to the swept EnableStages{1..6}/RowClockStages{1..6} grids (never testing the '0 stages / direct-connect' option), stages=1 does win at all 4 canonical points and all 8 per-N points, reproducing the previous (padding-bug-era) task's headline claim -- but that claim was only ever comparing 1-6 stages against each other, never against 0. When the direct-connect boundary is included (as it should be, since EnableTaper<=0/RowClockTaper<=0 are valid, already-supported settings), stages=1 LOSES to 0 stages at the two smallest points tested (N=4 and N=8, B=32) and wins from N=16 upward. Report this plainly: the original 'stages=1 wins everywhere' claim is TRUE only within the 1-6 stage range, and FALSE once the 0-stage option is included at small N/small fanout."
+    },
+    "does_n64_regime_boundary_survive": {
+      "answer": "YES, in a refined form. Within the 'stages=1 wins' regime (N>=16), the SELECTED TAPER shows a clear discontinuity at N=64: N=16 and N=32 prefer taper=6 (the upper edge of the swept range, confirmed a true local optimum by the taper-extension probe up to 24), while N=64, 128, 256, and 512 all prefer taper=1.0 (the lower edge -- effectively 'use the single largest available buffer that still fits under the target', since with only 1 stage a smaller taper divisor keeps the sizing target closer to the real final load). This taper regime boundary at N=64 is present in the corrected (both-fixes) model just as it was described for the (voided) padding-bug-era sweep -- it survives, though its underlying MEANING has changed (it is now a real taper-selection transition, not an artifact of stage-count padding, since padding is structurally impossible under the Part 4 fix)."
+    }
+  },
+  "changed_files": [
+    {
+      "path": ".gitignore",
+      "tracked": true,
+      "change": "Added '!tech/tech_models/*.txt' negation line (see part0_tech_file_identity.gitignore_fix.diff above for the full diff)."
+    },
+    {
+      "path": "tech/tech_models/7FinFET.txt",
+      "tracked": "visible via git status ('??') after the .gitignore fix; not yet git-add'ed (task did not ask to stage/commit)",
+      "change": "Nmos->SubthresholdTempSwing: 2.3000e+00 -> 7.1400e+01; Pmos->SubthresholdTempSwing: 2.3000e+00 -> 5.9700e+01 (see part3_xyce_extraction.tech_file_update_applied.diff above for the full diff). No other line changed -- confirmed via re-run of the user's own extract.py that every other leakage parameter already matched exactly."
+    },
+    {
+      "path": "model/electrical/DFFRAM.cc",
+      "tracked": true,
+      "change": "Anonymous-namespace helpers reworked: sizeBufChain() gained a post-hoc ratio-1.0 ASSERT; added computeAchievableStages(), loadStdCellSizes(), computeEnableLoad(), computeRowLoad(); computeChainStages()'s signature extended to (count_, stages_param_, taper_, final_load_, cache_, sizes_) and its body now caps the requested stage count at the achievable bound. All 6 call sites (2 in constructModel(), 2 in updateModel(), 2 in propagateTransitionInfo()) updated to compute and pass the real enable_load/row_load and the StdCellLib cache/sizes at each point -- constructModel() and propagateTransitionInfo() now read the StdCellLib cache directly (previously only updateModel() did), verified safe per the construction-order citation in part4. Full diff: 469 insertions, 119 deletions (git diff --stat). See part4_compute_chain_stages_fix for the substantive before/after."
+    },
+    {
+      "path": "main.cpp",
+      "tracked": true,
+      "change": "TEMPORARY: a self-contained dffram_diag CLI diagnostic (construct/update a standalone DFFRAM, report per-stage drive indices, write-clock-path delay, active area, leakage as one JSON line) was added and used for all Part 2/4/5 measurements in this task, then FULLY REVERTED via 'git checkout -- main.cpp' before delivery. Verified 0 occurrences of 'dffram_diag'/'runDffRamDiag' remain and the file matches its pre-task staged baseline (git diff --stat now shows only the 13-insertion/4-deletion change that already existed in the index before this task started, unrelated to this task)."
+    },
+    {
+      "path": "/mnt/c/Users/rezva/Downloads/xyce/09_pmos_temp.cir",
+      "tracked": "N/A -- outside the git repository entirely, on the user's own Windows filesystem calibration workspace",
+      "change": "NEW file authored this task: a PMOS temperature sweep SPICE deck, structurally matched to the pre-existing 05_nmos_temp.cir (same .STEP TEMP LIST 27 60 90 120, same Vds=Vdd=0.7V/Vgs=0 operating point), with PMOS netlist polarity matched against the repo's own 02_pmos_sweep.cir/06_pmos_stack.cir conventions. Actually run through the user's own installed Xyce.exe (XyceNF 7.10.0, invoked from WSL via its full Windows path) -- not fabricated. Manual diff (new file, full content): see part3_xyce_extraction.pmos.deck; full netlist reproduced verbatim: 'PMOS off current vs temperature - gives SubthresholdTempSwing / .include 7nm_TT_xyce.pm / Vs s 0 0.7 / Vd d 0 0.0 / Vg g 0 0.7 / M1 d g s s pmos_lvt NFIN=1 / .STEP TEMP LIST 27 60 90 120 / .DC Vg 0.7 0.7 0.1 / .PRINT DC FORMAT=NOINDEX I(Vd) / .END'"
+    },
+    {
+      "path": "/mnt/c/Users/rezva/Downloads/xyce/09_pmos_temp.cir.prn",
+      "tracked": "N/A -- outside the git repository",
+      "change": "NEW file: Xyce's raw DC-sweep output from running 09_pmos_temp.cir. Full content: 'I(VD)\\n2.25150025e-10\\n9.96958568e-10\\n3.09530340e-09\\n8.14478873e-09\\nEnd of Xyce(TM) Parameter Sweep'"
+    },
+    {
+      "path": "/mnt/c/Users/rezva/Downloads/xyce/09_pmos_temp.cir.res",
+      "tracked": "N/A -- outside the git repository",
+      "change": "NEW file: Xyce's .STEP-swept independent-variable output. Full content: 'STEP TEMP\\n0 2.70000000e+01\\n1 6.00000000e+01\\n2 9.00000000e+01\\n3 1.20000000e+02\\nEnd of Xyce(TM) Parameter Sweep'"
+    }
+  ],
+  "unfixed_discovered_issues_reported_not_fixed": [
+    "tech/TechModel.cc:139 -- calculatePmosLeakageCurrent reads Nmos->SubthresholdTempSwing instead of Pmos->SubthresholdTempSwing. Left unfixed per the constraint against touching energy-model code; empirically confirmed inert-in-practice for Pmos's own field today, since the Nmos value is silently substituted in its place.",
+    "The user's own /mnt/c/Users/rezva/Downloads/xyce/extract.py, handle_temp() -- reads only the .prn file (headers=['I(VD)'] only) and never opens the paired .res file where the actual swept TEMP values live, so col(headers,'TEMP','STEP','Index') returns None and the code silently falls back to the row-enumeration index (0,1,2,3) instead of real temperatures (27,60,90,120), producing the wrong 2.3 K/dec value that was originally shipped. This is the user's own external tool, outside the git repo and outside this task's stated scope (fixing the tech FILE's value, not the extraction script) -- reported, not modified.",
+    "router.cfg (repo configs/) currently fails to run end-to-end for two reasons unrelated to this task: (1) ElectricalTechModelFilename is written as 'ext/dsent/tech/tech_models/Bulk45LVT.model', a path that does not exist in this standalone repo layout; (2) even with that path corrected, RouterInputPort.cc:124 throws because router.cfg's NumberBuffersPerVirtualChannel values are inconsistent across virtual networks ([4,5]). Neither issue is touched by or related to this task's diff -- confirmed via git diff that configs/router.cfg was not modified by this task. DFFRAM's own model lifecycle (construct/update/propagateTransitionInfo, including live ElectricalTimingTree critical-path extraction) was instead verified directly via 988 diverse dffram_diag invocations (Part 4/5 sweeps) with zero errors, which is a broader and more direct test of the actual code this task changed than router.cfg would have been even if it ran."
+  ]
+}

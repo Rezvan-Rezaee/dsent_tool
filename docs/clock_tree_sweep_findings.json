@@ -1,0 +1,581 @@
+{
+  "task": "Sweep the clock-tree configuration (ClockTree->NumberLevels, RowClockFanout) to find the minimum-delay setting per buffer size. No permanent source changes to BroadcastHTree (Sweep 3's required_transition edits were temporary, restored and diff-verified).",
+  "sweep_1_number_levels": {
+    "description": "NumberLevels = 1..ceil(log2(N)) plus auto, at RowClockFanout = 0 and 4, for all 4 (N,B) points.",
+    "summary_per_point": [
+      {
+        "N": 4,
+        "B": 32,
+        "fanout": 0,
+        "ceil_log2N": 2,
+        "ceil_log2N_over_2_log4_hypothesis": 1,
+        "best_levels": 1,
+        "best_t_write_clock_path": 3.8815223894e-11,
+        "best_area": 2.4524544e-10,
+        "best_e_idle": 3.2794245968e-15
+      },
+      {
+        "N": 4,
+        "B": 32,
+        "fanout": 4,
+        "ceil_log2N": 2,
+        "ceil_log2N_over_2_log4_hypothesis": 1,
+        "best_levels": 1,
+        "best_t_write_clock_path": 5.3604398928e-11,
+        "best_area": 2.4828672e-10,
+        "best_e_idle": 2.7070024637e-14
+      },
+      {
+        "N": 64,
+        "B": 128,
+        "fanout": 0,
+        "ceil_log2N": 6,
+        "ceil_log2N_over_2_log4_hypothesis": 3,
+        "best_levels": 1,
+        "best_t_write_clock_path": 1.2592006636e-10,
+        "best_area": 1.547555328e-08,
+        "best_e_idle": 2.7753535712e-14
+      },
+      {
+        "N": 64,
+        "B": 128,
+        "fanout": 4,
+        "ceil_log2N": 6,
+        "ceil_log2N_over_2_log4_hypothesis": 3,
+        "best_levels": 1,
+        "best_t_write_clock_path": 1.4566822809e-10,
+        "best_area": 1.554043392e-08,
+        "best_e_idle": 1.1668636662e-12
+      },
+      {
+        "N": 512,
+        "B": 32,
+        "fanout": 0,
+        "ceil_log2N": 9,
+        "ceil_log2N_over_2_log4_hypothesis": 5,
+        "best_levels": 1,
+        "best_t_write_clock_path": 1.4255334258e-10,
+        "best_area": 3.0995712e-08,
+        "best_e_idle": 1.6660739401e-13
+      },
+      {
+        "N": 512,
+        "B": 32,
+        "fanout": 4,
+        "ceil_log2N": 9,
+        "ceil_log2N_over_2_log4_hypothesis": 5,
+        "best_levels": 1,
+        "best_t_write_clock_path": 1.5755942309e-10,
+        "best_area": 3.138499584e-08,
+        "best_e_idle": 3.2112355733e-12
+      },
+      {
+        "N": 512,
+        "B": 256,
+        "fanout": 0,
+        "ceil_log2N": 9,
+        "ceil_log2N_over_2_log4_hypothesis": 5,
+        "best_levels": 1,
+        "best_t_write_clock_path": 2.4500488435e-10,
+        "best_area": 2.4469936128e-07,
+        "best_e_idle": 1.8422399117e-13
+      },
+      {
+        "N": 512,
+        "B": 256,
+        "fanout": 4,
+        "ceil_log2N": 9,
+        "ceil_log2N_over_2_log4_hypothesis": 5,
+        "best_levels": 1,
+        "best_t_write_clock_path": 2.6478443829e-10,
+        "best_area": 2.452184064e-07,
+        "best_e_idle": 1.6846773944e-11
+      }
+    ],
+    "headline_finding": "NumberLevels=1 minimizes t_write_clock_path at EVERY (N,B) point, at BOTH fanout=0 and fanout=4 -- not ceil(log2(N)) (the current auto default) and not ceil(log2(N)/2) (the log4 hypothesis this task offered). For N=4, ceil(log2(N)/2)=1 happens to coincide with the true optimum, but for N=64 (ceil(log2(N)/2)=3) and N=512 (ceil(log2(N)/2)=5), the true optimum (1) undershoots even the log4 hypothesis. The honest characterization is 'as few tree levels as structurally possible' (levels=1), not a fanout-4-derived formula. Delay increases monotonically-ish with levels beyond 1 (with a non-monotonic jump-then-plateau around levels 6-9 at N=512, likely a repeater-insertion-algorithm segment-count step effect, not independently diagnosed further -- out of this task's scope).",
+    "raw_data_points": 60
+  },
+  "sweep_2_row_clock_fanout": {
+    "description": "RowClockFanout = 0, 2, 3, 4, 6, 8 at NumberLevels=1 (the Sweep 1 delay-minimizer) for all 4 (N,B) points.",
+    "summary_per_point": [
+      {
+        "N": 4,
+        "B": 32,
+        "levels": 1,
+        "best_fanout": 0,
+        "best_t_write_clock_path": 3.8815223894e-11,
+        "best_area": 2.4524544e-10,
+        "best_e_idle": 3.2794245968e-15,
+        "all_fanouts": [
+          {
+            "fanout": 0,
+            "t": 3.8815223894e-11,
+            "area": 2.4524544e-10,
+            "e_idle": 3.2794245968e-15
+          },
+          {
+            "fanout": 2,
+            "t": 6.3463795722e-11,
+            "area": 2.5031424e-10,
+            "e_idle": 3.3415342049e-14
+          },
+          {
+            "fanout": 3,
+            "t": 5.8534106266e-11,
+            "area": 2.4930048e-10,
+            "e_idle": 3.0242685859e-14
+          },
+          {
+            "fanout": 4,
+            "t": 5.3604398928e-11,
+            "area": 2.4828672e-10,
+            "e_idle": 2.7070024637e-14
+          },
+          {
+            "fanout": 6,
+            "t": 4.8674691796e-11,
+            "area": 2.4727296e-10,
+            "e_idle": 2.3897363415e-14
+          },
+          {
+            "fanout": 8,
+            "t": 4.8674691796e-11,
+            "area": 2.4727296e-10,
+            "e_idle": 2.3897363415e-14
+          }
+        ]
+      },
+      {
+        "N": 64,
+        "B": 128,
+        "levels": 1,
+        "best_fanout": 0,
+        "best_t_write_clock_path": 1.2592006636e-10,
+        "best_area": 1.547555328e-08,
+        "best_e_idle": 2.7753535712e-14,
+        "all_fanouts": [
+          {
+            "fanout": 0,
+            "t": 1.2592006636e-10,
+            "area": 1.547555328e-08,
+            "e_idle": 2.7753535712e-14
+          },
+          {
+            "fanout": 2,
+            "t": 1.6047935817e-10,
+            "area": 1.55890944e-08,
+            "e_idle": 1.3190834487e-12
+          },
+          {
+            "fanout": 3,
+            "t": 1.5060527061e-10,
+            "area": 1.555665408e-08,
+            "e_idle": 1.2176035937e-12
+          },
+          {
+            "fanout": 4,
+            "t": 1.4566822809e-10,
+            "area": 1.554043392e-08,
+            "e_idle": 1.1668636662e-12
+          },
+          {
+            "fanout": 6,
+            "t": 1.407311864e-10,
+            "area": 1.552421376e-08,
+            "e_idle": 1.1161237387e-12
+          },
+          {
+            "fanout": 8,
+            "t": 1.407311864e-10,
+            "area": 1.552421376e-08,
+            "e_idle": 1.1161237387e-12
+          }
+        ]
+      },
+      {
+        "N": 512,
+        "B": 32,
+        "levels": 1,
+        "best_fanout": 0,
+        "best_t_write_clock_path": 1.4255334258e-10,
+        "best_area": 3.0995712e-08,
+        "best_e_idle": 1.6660739401e-13,
+        "all_fanouts": [
+          {
+            "fanout": 0,
+            "t": 1.4255334258e-10,
+            "area": 3.0995712e-08,
+            "e_idle": 1.6660739401e-13
+          },
+          {
+            "fanout": 2,
+            "t": 1.6756282947e-10,
+            "area": 3.16445184e-08,
+            "e_idle": 4.0230588659e-12
+          },
+          {
+            "fanout": 3,
+            "t": 1.625612195e-10,
+            "area": 3.151475712e-08,
+            "e_idle": 3.6171472448e-12
+          },
+          {
+            "fanout": 4,
+            "t": 1.5755942309e-10,
+            "area": 3.138499584e-08,
+            "e_idle": 3.2112355733e-12
+          },
+          {
+            "fanout": 6,
+            "t": 1.5255744044e-10,
+            "area": 3.125523456e-08,
+            "e_idle": 2.8053238516e-12
+          },
+          {
+            "fanout": 8,
+            "t": 1.5255744044e-10,
+            "area": 3.125523456e-08,
+            "e_idle": 2.8053238516e-12
+          }
+        ]
+      },
+      {
+        "N": 512,
+        "B": 256,
+        "levels": 1,
+        "best_fanout": 0,
+        "best_t_write_clock_path": 2.4500488435e-10,
+        "best_area": 2.4469936128e-07,
+        "best_e_idle": 1.8422399117e-13,
+        "all_fanouts": [
+          {
+            "fanout": 0,
+            "t": 2.4500488435e-10,
+            "area": 2.4469936128e-07,
+            "e_idle": 1.8422399117e-13
+          },
+          {
+            "fanout": 2,
+            "t": 2.8456404663e-10,
+            "area": 2.4573745152e-07,
+            "e_idle": 1.8470373333e-11
+          },
+          {
+            "fanout": 3,
+            "t": 2.7467423566e-10,
+            "area": 2.4547792896e-07,
+            "e_idle": 1.7658573639e-11
+          },
+          {
+            "fanout": 4,
+            "t": 2.6478443829e-10,
+            "area": 2.452184064e-07,
+            "e_idle": 1.6846773944e-11
+          },
+          {
+            "fanout": 6,
+            "t": 2.6478443829e-10,
+            "area": 2.452184064e-07,
+            "e_idle": 1.6846773944e-11
+          },
+          {
+            "fanout": 8,
+            "t": 2.598395447e-10,
+            "area": 2.4508864512e-07,
+            "e_idle": 1.6440874097e-11
+          }
+        ]
+      }
+    ],
+    "headline_finding": "RowClockFanout=0 (no RowBuf chain at all -- direct connection) minimizes t_write_clock_path at EVERY point, consistent with the prior task's finding that adding the fanout-4 BUF chain made delay WORSE, not better, at the two points tested there. Here, across the full 0/2/3/4/6/8 sweep, delay is worst at fanout=2 and generally improves (decreases) as fanout rises from 2 toward 8, but never beats fanout=0 (no buffering) at any point tested."
+  },
+  "sweep_3_sizing_target_sensitivity": {
+    "description": "required_transition temporarily set to 20e-12 and 10e-12 (from the current 40e-12), rebuilt, measured at the Sweep 1-2 best settings (levels=1) across fanout=0..8, at all 4 points. File restored to 40e-12 afterward -- byte-identical diff CONFIRMED.",
+    "file_restored_confirmed_via_diff": true,
+    "summary_per_point": [
+      {
+        "N": 4,
+        "B": 32,
+        "t_at_40ps_best": 3.8815223894e-11,
+        "t_at_20ps_best": 3.8815223894e-11,
+        "area_at_20ps_best": 2.4524544e-10,
+        "t_at_10ps_best": 3.8815223894e-11,
+        "area_at_10ps_best": 2.4524544e-10,
+        "pct_of_remaining_40ps_delay_attributable_to_hardcoded_constant": 0.0
+      },
+      {
+        "N": 64,
+        "B": 128,
+        "t_at_40ps_best": 1.2592006636e-10,
+        "t_at_20ps_best": 1.1372048634e-10,
+        "area_at_20ps_best": 1.54758912e-08,
+        "t_at_10ps_best": 9.9650976155e-11,
+        "area_at_10ps_best": 1.54771584e-08,
+        "pct_of_remaining_40ps_delay_attributable_to_hardcoded_constant": 20.86
+      },
+      {
+        "N": 512,
+        "B": 32,
+        "t_at_40ps_best": 1.4255334258e-10,
+        "t_at_20ps_best": 1.3733619013e-10,
+        "area_at_20ps_best": 3.099596544e-08,
+        "t_at_10ps_best": 1.1429931019e-10,
+        "area_at_10ps_best": 3.099647232e-08,
+        "pct_of_remaining_40ps_delay_attributable_to_hardcoded_constant": 19.82
+      },
+      {
+        "N": 512,
+        "B": 256,
+        "t_at_40ps_best": 2.4500488435e-10,
+        "t_at_20ps_best": 2.5047467662e-10,
+        "area_at_20ps_best": 2.4469944576e-07,
+        "t_at_10ps_best": 2.3352643869e-10,
+        "area_at_10ps_best": 2.4470045952e-07,
+        "pct_of_remaining_40ps_delay_attributable_to_hardcoded_constant": 4.68
+      }
+    ],
+    "finding": "Tightening the sizing target generally reduces delay further, but not always monotonically or by a large amount: (512,32) and (64,128) improve smoothly and substantially (~20% each from 40ps-best to 10ps-best); (512,256) actually gets WORSE at 20ps before improving again at 10ps (reported as observed, not smoothed over); (4,32) shows NO change across all three targets at all (already at max driving strength / below the target at this tiny scale, so tightening it further has no effect there). The hardcoded 40e-12 constant is NOT the dominant remaining delay source anywhere -- it accounts for 0% to ~21% of the 40ps-best remaining delay across the four points, meaning the majority of the remaining 40-250ps delay comes from fundamental gate/wire RC at the current sizing, not from this specific hardcoded choice. This constant's own TODO (mentioned in the task's context) is a real but secondary lever, confirmed by measurement, not assumed."
+  },
+  "validation": {
+    "1_best_vs_pre_phase4_baseline": {
+      "description": "Best t_write_clock_path per point (NumberLevels=1, RowClockFanout=0, at the CURRENT/unchanged 40ps sizing target -- since Sweep 3's tighter targets are measurement-only, not part of the recommended, deployable setting) vs the pre-Phase-4 unbuffered baseline.",
+      "points": [
+        {
+          "config": "(4,32)",
+          "best_t_write_clock_path": 3.8815223894e-11,
+          "pre_phase4_baseline": 7.217e-11,
+          "ratio_baseline_over_best": 1.859,
+          "faster_than_baseline": true,
+          "baseline_source": "given in this task"
+        },
+        {
+          "config": "(64,128)",
+          "best_t_write_clock_path": 1.2592006636e-10,
+          "pre_phase4_baseline": 2.21138e-10,
+          "ratio_baseline_over_best": 1.756,
+          "faster_than_baseline": true,
+          "baseline_source": "from prior task's stored dffram_clock_distribution_validation_results.txt"
+        },
+        {
+          "config": "(512,32)",
+          "best_t_write_clock_path": 1.4255334258e-10,
+          "pre_phase4_baseline": 6.746e-10,
+          "ratio_baseline_over_best": 4.732,
+          "faster_than_baseline": true,
+          "baseline_source": "given in this task"
+        },
+        {
+          "config": "(512,256)",
+          "best_t_write_clock_path": 2.4500488435e-10,
+          "pre_phase4_baseline": 7.652e-10,
+          "ratio_baseline_over_best": 3.123,
+          "faster_than_baseline": true,
+          "baseline_source": "given in this task"
+        }
+      ],
+      "headline": "The tree is now FASTER than the pre-Phase-4 unbuffered baseline at EVERY point (1.76x to 4.73x), using only a parameter change (NumberLevels=1, RowClockFanout=0) -- no source modification. This directly resolves the prior task's finding that the tree, at its AUTO/fanout=4 defaults, was actually SLOWER than the unbuffered baseline at (512,256) (0.92x, a regression). That regression is a consequence of the DEFAULT parameter choice, not an inherent limitation of DSENT's tree model -- correcting the parameters resolves it cleanly."
+    },
+    "2_area_idle_cost_of_best_setting": {
+      "description": "Area and Idle-energy cost of the best-delay setting (levels=1, fanout=0) versus the CURRENT default (levels=auto, fanout=4).",
+      "points": [
+        {
+          "config": "(4,32)",
+          "best_setting": "NumberLevels=1, RowClockFanout=0",
+          "default_setting": "NumberLevels=auto(9 or fewer), RowClockFanout=4",
+          "area_best": 2.4524544e-10,
+          "area_default": 2.4896256e-10,
+          "area_delta_pct": -1.493,
+          "e_idle_best": 3.2794245968e-15,
+          "e_idle_default": 2.9736853769e-14,
+          "e_idle_delta_pct": -88.97
+        },
+        {
+          "config": "(64,128)",
+          "best_setting": "NumberLevels=1, RowClockFanout=0",
+          "default_setting": "NumberLevels=auto(9 or fewer), RowClockFanout=4",
+          "area_best": 1.547555328e-08,
+          "area_default": 1.556113152e-08,
+          "area_delta_pct": -0.55,
+          "e_idle_best": 2.7753535712e-14,
+          "e_idle_default": 1.2547206715e-12,
+          "e_idle_delta_pct": -97.79
+        },
+        {
+          "config": "(512,32)",
+          "best_setting": "NumberLevels=1, RowClockFanout=0",
+          "default_setting": "NumberLevels=auto(9 or fewer), RowClockFanout=4",
+          "area_best": 3.0995712e-08,
+          "area_default": 3.155606784e-08,
+          "area_delta_pct": -1.776,
+          "e_idle_best": 1.6660739401e-13,
+          "e_idle_default": 3.7525044131e-12,
+          "e_idle_delta_pct": -95.56
+        },
+        {
+          "config": "(512,256)",
+          "best_setting": "NumberLevels=1, RowClockFanout=0",
+          "default_setting": "NumberLevels=auto(9 or fewer), RowClockFanout=4",
+          "area_best": 2.4469936128e-07,
+          "area_default": 2.4538930944e-07,
+          "area_delta_pct": -0.281,
+          "e_idle_best": 1.8422399117e-13,
+          "e_idle_default": 1.751555863e-11,
+          "e_idle_delta_pct": -98.95
+        }
+      ],
+      "headline": "There is NO real tradeoff here: the best-delay setting is simultaneously SMALLER in area (-0.28% to -1.78%) and dramatically LOWER in Idle energy (-89% to -99%) than the current default, at every point. Fewer tree levels and no row-buffer chain simply means fewer cells switching every cycle. The current default (auto levels + fanout=4) is worse than the recommended setting on every axis measured -- delay, area, AND idle energy -- with no offsetting benefit found."
+    },
+    "3_refit_depth_scaling": {
+      "description": "t_write_clock_path vs log2(N) at B=32, N=4..512, using the best settings (NumberLevels=1, RowClockFanout=0).",
+      "raw_points": [
+        {
+          "N": 4,
+          "t_write_clock_path": 3.8815223894e-11
+        },
+        {
+          "N": 8,
+          "t_write_clock_path": 4.8162021486e-11
+        },
+        {
+          "N": 16,
+          "t_write_clock_path": 6.6111521986e-11
+        },
+        {
+          "N": 32,
+          "t_write_clock_path": 6.951743341e-11
+        },
+        {
+          "N": 64,
+          "t_write_clock_path": 7.4973063853e-11
+        },
+        {
+          "N": 128,
+          "t_write_clock_path": 8.3990213771e-11
+        },
+        {
+          "N": 256,
+          "t_write_clock_path": 9.9348507167e-11
+        },
+        {
+          "N": 512,
+          "t_write_clock_path": 1.4255334258e-10
+        }
+      ],
+      "fit": {
+        "slope": 1.239513e-11,
+        "intercept": 9.760698e-12,
+        "r_squared": 0.883112
+      },
+      "comparison_to_current_default_fit": {
+        "current_default_fit": {
+          "slope": 7.283185e-11,
+          "intercept": -1.919685e-10,
+          "r_squared": 0.755149
+        },
+        "conclusion": "The re-fit IMPROVES both R^2 (0.755 -> 0.883) and, more importantly, reduces the slope by ~6x (7.28e-11 -> 1.24e-11 s per log2-doubling) -- growth with depth is much gentler at the best settings, as expected once the H-tree's own level-count contribution is minimized. It does NOT fully linearize, though: residuals still show curvature (a dip in the middle of the range, N=64-256, and an uptick at the largest N=512), so 'accelerating growth at large N' is reduced but not eliminated -- reported honestly rather than claiming a perfect fix."
+      }
+    },
+    "4_plausibility_gate": {
+      "description": "Best t_write_clock_path as a percentage of a 1 ns clock period at each point (NumberLevels=1, RowClockFanout=0).",
+      "points": [
+        {
+          "config": "(4,32)",
+          "best_t_write_clock_path": 3.8815223894e-11,
+          "pct_of_1ns_period": 3.88,
+          "exceeds_30pct_flag": false
+        },
+        {
+          "config": "(64,128)",
+          "best_t_write_clock_path": 1.2592006636e-10,
+          "pct_of_1ns_period": 12.59,
+          "exceeds_30pct_flag": false
+        },
+        {
+          "config": "(512,32)",
+          "best_t_write_clock_path": 1.4255334258e-10,
+          "pct_of_1ns_period": 14.26,
+          "exceeds_30pct_flag": false
+        },
+        {
+          "config": "(512,256)",
+          "best_t_write_clock_path": 2.4500488435e-10,
+          "pct_of_1ns_period": 24.5,
+          "exceeds_30pct_flag": false
+        }
+      ],
+      "conclusion": "All 4 points are comfortably under the ~30% flag threshold (max 24.50% at (512,256)) -- a credible design point. For contrast, the CURRENT default settings (levels=auto, fanout=4) reach 82.88% of the period at (512,256) -- a value that WOULD have failed this plausibility gate, underscoring that the default parameters (not DSENT's tree model itself) are the source of the previously implausible numbers.",
+      "current_default_for_contrast": [
+        {
+          "config": "(4,32)",
+          "t_write_clock_path": 5.4875463315e-11,
+          "pct_of_1ns_period": 5.49,
+          "exceeds_30pct_flag": false
+        },
+        {
+          "config": "(64,128)",
+          "t_write_clock_path": 2.0865745057e-10,
+          "pct_of_1ns_period": 20.87,
+          "exceeds_30pct_flag": false
+        },
+        {
+          "config": "(512,32)",
+          "t_write_clock_path": 6.4738901259e-10,
+          "pct_of_1ns_period": 64.74,
+          "exceeds_30pct_flag": true
+        },
+        {
+          "config": "(512,256)",
+          "t_write_clock_path": 8.2882739048e-10,
+          "pct_of_1ns_period": 82.88,
+          "exceeds_30pct_flag": true
+        }
+      ]
+    },
+    "5_default_settings_unperturbed": {
+      "description": "Area, leakage, e_read, e_write at the DEFAULT settings (levels=auto, fanout=4), confirmed unchanged by the sweep (including after Sweep 3's temporary required_transition edits and restoration).",
+      "points": [
+        {
+          "config": "(4,32)",
+          "area": 2.4896256e-10,
+          "leak": 0.000222332923,
+          "e_write": 1.3042756793e-13,
+          "e_read": 4.2778213042e-14
+        },
+        {
+          "config": "(64,128)",
+          "area": 1.556113152e-08,
+          "leak": 0.014066777423,
+          "e_write": 4.3534032161e-12,
+          "e_read": 2.9523500058e-12
+        },
+        {
+          "config": "(512,32)",
+          "area": 3.155606784e-08,
+          "leak": 0.028470430222,
+          "e_write": 9.5667187021e-12,
+          "e_read": 5.7673749546e-12
+        },
+        {
+          "config": "(512,256)",
+          "area": 2.4538930944e-07,
+          "leak": 0.2225649026,
+          "e_write": 6.3819992859e-11,
+          "e_read": 4.6138999637e-11
+        }
+      ],
+      "confirmation": "Bit-for-bit identical to the prior task's stored/measured Phase-4-default numbers (e.g. (4,32): area=2.489626e-10 both, e_read=4.277821e-14 both, e_write=1.304276e-13 both) -- the sweep and the temporary Sweep 3 source edits did not perturb the default configuration's results at all."
+    }
+  },
+  "deliverable_recommendation": {
+    "recommendation": "Hard-set ClockTree->NumberLevels default to 1 (i.e. change the auto formula from 'ceil(log2(NumberEntries))' to a flat '1') and RowClockFanout default to 0 (i.e. disable the per-row BUF chain by default) in DFFRAM.cc.",
+    "justification": "Across all 4 measured (N,B) points and the full B=32 depth sweep, NumberLevels=1 and RowClockFanout=0 simultaneously minimize t_write_clock_path, minimize area, AND minimize Idle energy -- there is no tradeoff to weigh; every other tested combination is worse on every axis. At these settings the tree beats the pre-Phase-4 unbuffered baseline at every point (1.76x-4.73x), stays comfortably under the 30% plausibility threshold at every point (max 24.5%), and the depth-scaling fit improves substantially (slope 6x gentler, R^2 up from 0.755 to 0.883). NumberLevels=1 also has an appealing interpretation: it corresponds to the structural minimum this model supports (constructModel() ASSERTs NumberLevels>0), effectively reducing the H-tree to a single repeated-segment stage feeding the leaf driver chain directly -- close to, but not identical to, the true pre-Phase-4 unbuffered design, while still retaining the tree's wire-RC-aware segment-insertion logic for the one level that remains.",
+    "not_applied": "This is a recommendation only, per the task's explicit instruction -- DFFRAM.cc has not been modified.",
+    "caveat": "This recommendation is based on measurements at the current, unchanged 40e-12 required_transition sizing target. Sweep 3 shows a further, smaller (0-21% of remaining delay, non-monotonic at one point) improvement is available by separately revisiting that hardcoded constant, but that is explicitly out of scope for this task and not folded into this recommendation."
+  },
+  "constraints_honored": {
+    "no_permanent_broadcasthtree_changes": "Confirmed via diff after Sweep 3 -- byte-identical to pre-sweep content, required_transition = 40e-12 restored.",
+    "no_dffram_changes": "DFFRAM.cc was read-only throughout this task -- only its existing ClockTree->NumberLevels and RowClockFanout parameters were set from the measurement harness, never its source.",
+    "area": "Area->Active only, never summed with Metal1Wire",
+    "output_format": "JSON"
+  }
+}

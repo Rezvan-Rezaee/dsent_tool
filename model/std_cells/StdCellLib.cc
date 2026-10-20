@@ -110,8 +110,11 @@ namespace DSENT
         double nmos_unit_width = gate_min_width;
         double pmos_unit_width = gate_min_width * pn_ratio;
         
+        // DSENT-ASSUMPTION: cell height comes from routing track count
+        // (StdCell->Tracks) and HeightOverheadFactor, not transistors --
+        // transistor width is then fitted into the resulting active height.
         // Derive the height of each cell in the standard cell library, as well as the max Nmos and Pmos widths
-        double std_cell_total_height = getTechModel()->get("StdCell->Tracks").toDouble() * 
+        double std_cell_total_height = getTechModel()->get("StdCell->Tracks").toDouble() *
             (getTechModel()->get("Wire->Metal1->MinWidth").toDouble() + getTechModel()->get("Wire->Metal1->MinSpacing").toDouble());
         double std_cell_active_height = std_cell_total_height / getTechModel()->get("StdCell->HeightOverheadFactor").toDouble();
 
@@ -165,9 +168,22 @@ namespace DSENT
             or2->cacheStdCell(this, cell_sizes[i].toDouble());
             delete or2;
 
-            StdCell* and2 = createStdCell("AND2", "CachedAND2");           
+            StdCell* and2 = createStdCell("AND2", "CachedAND2");
             and2->cacheStdCell(this, cell_sizes[i].toDouble());
             delete and2;
+
+            // Phase 4 (DFFRAM buffered clock distribution) needs BUF at
+            // runtime. BUF.cc already implements cacheStdCell() (mirroring
+            // every other cell above) but was never wired into this loop,
+            // so every createStdCell("BUF", ...) unconditionally threw
+            // "Key not found: BUF_X#->Cap->A" -- a pre-existing gap, not
+            // specific to any one tech model file (none of them are missing
+            // BUF entries; nothing in this loop reads per-cell-type .model
+            // entries at all, it's all derived from the same generic
+            // Nmos/Pmos/StdCell parameters read above).
+            StdCell* buf = createStdCell("BUF", "CachedBUF");
+            buf->cacheStdCell(this, cell_sizes[i].toDouble());
+            delete buf;
         }
 
         Log::printLine("Standard cell library creation - End");

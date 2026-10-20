@@ -68,7 +68,7 @@ Pmos->EffResWidth = 0.930e-3
 #------------------------------------------------------------------------------
 # The ratio of extra effective resistance with each additional stacked
 # transistor
-#       EffResStackRatio = (R_EFF_NAND2 - R_EFF_INV) / R_EFF_INV)
+#       EffResStackRatio = ((R_EFF_NAND2 - R_EFF_INV) / R_EFF_INV)
 # For example, inverter has an normalized effective drive resistance of 1.0.
 # A NAND2 (2-stack) will have an effective drive of 1.0 + 0.7, a NAND3 (3-stack)
 # will have an effective drive of 1.0 + 2 * 0.7. Use NORs for Pmos. This fit

@@ -1,0 +1,196 @@
+{
+  "phase": 5,
+  "description": "Rate-driven buffer activity validation: RouterInputPort WriteRate/ReadRate/FlitToggleRate replacing hardcoded write-enable-always-asserted and uniform-random-flit-data assumptions.",
+  "sweep_config": {
+    "tech": "tech/tech_models/Bulk22LVT.model",
+    "frequency_hz": 1000000000.0,
+    "num_vns": 1,
+    "vcs_per_vn": [
+      1
+    ],
+    "bufs_per_vc": [
+      64
+    ],
+    "flit_width": 128,
+    "buffer_model": "DFFRAM",
+    "note": "N=64 (bufs_per_vc), B=128 (flit_width), single VC (VC count not specified by task; chosen for isolation of WriteRate/ReadRate effects)."
+  },
+  "constraints_honored": {
+    "area_reported_as": "Area->Active only, never summed with Metal1Wire",
+    "energy_semantics": "C*Vdd^2 per 0->1 transition, no 1/2 factor applied (DSENT's own convention, unmodified)",
+    "output_format": "JSON"
+  },
+  "validation": {
+    "1_area_leakage_bit_identical": {
+      "description": "Area->Active and NddPower->Leakage must be bit-identical to Phase 4 baseline at every sweep point / rate setting.",
+      "baseline_phase4": {
+        "area_total": 1.559399424e-08,
+        "leak_total": 0.01409555998
+      },
+      "checked_configs": 13,
+      "bit_identical": true,
+      "mismatches": []
+    },
+    "2_writerate_sweep_e_write": {
+      "description": "Sweep WriteRate at fixed N=64,B=128 (ReadRate=1.0, FlitToggleRate=0.5 held fixed). e_write must fall monotonically as WriteRate falls.",
+      "points": [
+        {
+          "write_rate": 0.1,
+          "e_write": 4.245042291e-12,
+          "e_read": 2.969626841e-12
+        },
+        {
+          "write_rate": 0.25,
+          "e_write": 4.2483306e-12,
+          "e_read": 2.969626841e-12
+        },
+        {
+          "write_rate": 0.5,
+          "e_write": 4.25292949e-12,
+          "e_read": 2.969626841e-12
+        },
+        {
+          "write_rate": 1.0,
+          "e_write": 4.259683263e-12,
+          "e_read": 2.969626841e-12
+        }
+      ],
+      "monotonic_increasing_in_write_rate": true,
+      "ratio_writerate_1p0_over_0p1": 1.0034489578657533,
+      "e_read_unaffected": true
+    },
+    "3_readrate_sweep_e_read_and_independence": {
+      "description": "Sweep ReadRate at fixed N=64,B=128 (WriteRate=1.0, FlitToggleRate=0.5 held fixed). e_read must fall monotonically as ReadRate falls; e_write must not move under a ReadRate-only sweep, and vice versa (checked against item 2's e_read column).",
+      "points": [
+        {
+          "read_rate": 0.1,
+          "e_read": 3.726807374e-13,
+          "e_write": 4.259683263e-12
+        },
+        {
+          "read_rate": 0.25,
+          "e_read": 8.803548417e-13,
+          "e_write": 4.259683263e-12
+        },
+        {
+          "read_rate": 0.5,
+          "e_read": 1.649455902e-12,
+          "e_write": 4.259683263e-12
+        },
+        {
+          "read_rate": 1.0,
+          "e_read": 2.969626841e-12,
+          "e_write": 4.259683263e-12
+        }
+      ],
+      "monotonic_increasing_in_read_rate": true,
+      "ratio_readrate_1p0_over_0p1": 7.968286372184257,
+      "e_write_unaffected_by_readrate_sweep": true,
+      "e_read_unaffected_by_writerate_sweep": true
+    },
+    "4_flittogglerate_sweep_e_write_linear_e_read_untouched": {
+      "description": "Sweep FlitToggleRate at fixed N=64,B=128 (WriteRate=ReadRate=1.0 held fixed). e_write must scale roughly linearly with it; e_read must not move at all.",
+      "points": [
+        {
+          "flit_toggle_rate": 0.1,
+          "e_write": 1.96795245e-12,
+          "e_read": 2.969626841e-12
+        },
+        {
+          "flit_toggle_rate": 0.5,
+          "e_write": 4.259683263e-12,
+          "e_read": 2.969626841e-12
+        },
+        {
+          "flit_toggle_rate": 1.0,
+          "e_write": 7.124346779e-12,
+          "e_read": 2.969626841e-12
+        }
+      ],
+      "linear_fit_intercept_A": 1.3950197467777778e-12,
+      "linear_fit_slope_B": 5.729327032222222e-12,
+      "midpoint_predicted_from_linear_fit": 4.259683262888889e-12,
+      "midpoint_actual": 4.259683263e-12,
+      "relative_error_vs_linear_fit": 2.6084380100516132e-11,
+      "e_read_unaffected": true
+    },
+    "5_all_zero_rates_idle_nonzero": {
+      "description": "WriteRate=ReadRate=FlitToggleRate=0 -> e_idle must be non-zero (clock tree / flop clock pins still switch every cycle regardless of traffic).",
+      "e_idle": 1.266392539e-12,
+      "e_idle_nonzero": true,
+      "e_idle_matches_phase4_baseline_exactly": true,
+      "e_write_at_all_zero_floor": 1.377923136e-12,
+      "e_read_at_all_zero_floor": 1.167186774e-14,
+      "area_total_at_all_zero": 1.559399424e-08,
+      "leak_total_at_all_zero": 0.01409555998
+    },
+    "6_delta_at_all_rates_1p0_vs_phase4_baseline": {
+      "description": "Delta at WriteRate=ReadRate=1.0, FlitToggleRate=0.5 (Phase 5 defaults) vs stored Phase 4 baseline (same N=64,B=128 config, pre-Phase-5 code). Attributed to change (a): Push/WE's TransitionInfo now models 'toggles every cycle' (P(1)=0.5) instead of the old 'held high, never toggling' (P(1)=1.0) -- this is an intentional, documented behavior change, not a regression.",
+      "e_write": {
+        "phase4_baseline": 4.371005903e-12,
+        "phase5_at_defaults": 4.259683263e-12,
+        "delta": -1.113226399999998e-13,
+        "ratio_phase5_over_phase4": 0.9745315740883363
+      },
+      "e_write_component_breakdown": {
+        "e_write_decoder": {
+          "phase4_baseline": 1.116579204e-14,
+          "phase5_at_defaults": 1.116579204e-14,
+          "delta": 0.0,
+          "ratio_phase5_over_phase4": 1.0
+        },
+        "e_write_dff_array": {
+          "phase4_baseline": 3.085020753e-12,
+          "phase5_at_defaults": 2.974946113e-12,
+          "delta": -1.1007463999999993e-13,
+          "ratio_phase5_over_phase4": 0.9643196435897687
+        },
+        "e_write_clockgate": {
+          "phase4_baseline": 2.495999907e-15,
+          "phase5_at_defaults": 1.247999953e-15,
+          "delta": -1.2479999540000003e-15,
+          "ratio_phase5_over_phase4": 0.4999999997996794
+        },
+        "e_write_rdaddr_dff": {
+          "phase4_baseline": 0,
+          "phase5_at_defaults": 0,
+          "delta": 0,
+          "ratio_phase5_over_phase4": null
+        }
+      },
+      "e_read": {
+        "phase4_baseline": 2.969626841e-12,
+        "phase5_at_defaults": 2.969626841e-12,
+        "delta": 0.0,
+        "ratio_phase5_over_phase4": 1.0
+      },
+      "e_idle": {
+        "phase4_baseline": 1.266392539e-12,
+        "phase5_at_defaults": 1.266392539e-12,
+        "delta": 0.0,
+        "ratio_phase5_over_phase4": 1.0
+      },
+      "area_total": {
+        "phase4_baseline": 1.559399424e-08,
+        "phase5_at_defaults": 1.559399424e-08,
+        "identical": true
+      },
+      "leak_total": {
+        "phase4_baseline": 0.01409555998,
+        "phase5_at_defaults": 0.01409555998,
+        "identical": true
+      },
+      "root_cause_note": "The delta is almost entirely (~98.9%) in e_write_dff_array, not in a standalone 'WE wire' term -- Push/WE gates DFFRAM's per-row write clock (NAND2_CKGate1_i), so changing WE's own P(1) from 1.0 to 0.5 changes the gated clock's computed transition profile seen by every row's DFFQ, which DFFRAM attributes to its DFFD/DFFQ/CK sub-events (summed into e_write_dff_array). e_write_clockgate exactly halves (P(1) 1.0->0.5), consistent with this. FlitIn's own TransitionInfo is numerically unchanged at the new FlitToggleRate=0.5 default (0.25,0.25,0.25 either way), so none of this delta comes from flit data activity."
+    }
+  },
+  "prerequisite_fix": {
+    "file": "BufferCharacteristics.cc",
+    "issue": "Stale rip->getSubInstance(\"RDAddr_DFF\"+j) references from before Phase 2's FIFOControl rework; RouterInputPort no longer has that sub-instance (only \"RAM\" and \"FIFO0\"/\"FIFO1\"/...). Running the tool as found threw 'Instance not exists (RDAddr_DFF0)' immediately -- confirmed empirically before any Phase 5 edits.",
+    "fix": "Repointed the read-pointer-register area/leakage/energy breakdown to FIFO0's own RDIdx_DFF0..idx_bits-1 (idx_bits, not addr_bits -- the VC-select bits above the per-VC slice have no real flops). Added --write-rate/--read-rate/--flit-toggle-rate CLI flags (defaults 1.0/1.0/0.5, matching RouterInputPort's own parameter defaults) so real sweeps could be run for this validation."
+  },
+  "code_changes_summary": {
+    "RouterInputPort.cc/.h": "Added WriteRate (default 1.0), ReadRate (default 1.0), FlitToggleRate (default 0.5) parameters with [0,1] ASSERTs. FlitIn on WriteBuffer now derived from FlitToggleRate (numerically identical to the old (0.25,0.25,0.25) at the new default). Push on WriteBuffer and Pop on ReadBuffer now derived from WriteRate/ReadRate respectively, mirroring OutputVCState's Grant/CreditIn-scaled-by-Utilization pattern exactly -- NOT bit-identical to the old hardcoded (0,0,1) even at rate=1.0, by design (see item 6). WriteRate/ReadRate are also passed down to each FIFOControl instance.",
+    "FIFOControl.cc/.h": "Added WriteRate/ReadRate parameters (default 1.0 each, set by RouterInputPort). WRIdx_DFF/RDIdx_DFF's counter-aware D-formula p = 1/2^(i+1) is now p = WriteRate/2^(i+1) (resp. ReadRate) -- numerically identical to the old formula at the new default of 1.0.",
+    "OutputVCState.cc/.h": "Documentation-only cross-reference comments ('Phase 5 unification note') -- no numeric or structural change. True single-source value sharing between RouterInputPort's WriteRate/ReadRate and OutputVCState's Utilization would require editing Router.cc, which is out of this phase's file scope."
+  }
+}

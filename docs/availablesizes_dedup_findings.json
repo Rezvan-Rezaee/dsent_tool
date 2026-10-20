@@ -1,0 +1,569 @@
+{
+  "task": "Fix StdCell->AvailableSizes duplication in the tech file, then re-verify DFFRAM sizing under the corrected list",
+  "part_0_duplicate_resolution": {
+    "filename_discrepancy": "The task refers to 'pdk_dsent.txt', which does not exist anywhere in this repository (confirmed: grep -rl pdk_dsent . returns nothing). The file matching the exact description given -- two StdCell->AvailableSizes definitions, a 10-entry list then a 7-entry list, with the exact values quoted -- is tech/tech_models/7FinFET.txt (10-entry at line 184, 7-entry at line 205, pre-edit). Proceeding on the assumption this is the intended file. IMPORTANT: none of my own prior DFFRAM sizing work in this project used 7FinFET.txt -- every prior measurement used tech/tech_models/Bulk22LVT.model, which has a SINGLE, non-duplicated StdCell->AvailableSizes definition (10 entries, indices 0-9, at line 198) and was never affected by this bug at all. See the note on Part 5 below.",
+    "q1_parser_and_behavior": {
+      "class": "LibUtil::readFile(const char*, std::map<String,String>&) -- libutil/Config.cc:31-117. Called from TechModel::readFile() -- tech/TechModel.cc:58-61 (which itself is called once per tech file/INCLUDE from DSENT's model-construction entry points).",
+      "duplicate_key_behavior": "LAST-WINS. libutil/Config.cc:115: `config[key] = line;  // overwrites if key is repeated` -- the comment is the code's own, not mine. std::map::operator[] assignment on an existing key overwrites the stored value; the file is read top-to-bottom in one pass, so whichever occurrence appears LATER in the file wins.",
+      "consequence_for_7FinFET_txt_pre_edit": "The 7-entry list (originally at line 205, AFTER the 10-entry list at line 184) was ALREADY the one in effect for any run using this file, even before this task's edit -- last-wins means the second definition silently overrides the first regardless of which one a reader's eye lands on first."
+    },
+    "q2_which_list_was_in_effect_for_index_9_runs": {
+      "answer": "Neither list in 7FinFET.txt produced the index-9 results referenced. Index 9 requires a 10-element list (indices 0-9); 7FinFET.txt's EFFECTIVE list (last-wins, see above) has only 7 elements (indices 0-6), so index 9 is structurally impossible to obtain from this file regardless of which definition 'wins'. Every 'stage index 9' result in this project's prior reports (e.g. enable_stage_idx:[0,0,0,4,9] at (512,256) in docs/enable_buf_taper_fix_findings.json) came from tech/tech_models/Bulk22LVT.model, whose own StdCell->AvailableSizes (tech/tech_models/Bulk22LVT.model:198) is a SINGLE, non-duplicated 10-entry list -- index 9 there is the legitimate, unambiguous top of that list, uncontaminated by any duplicate-key issue. The duplication in 7FinFET.txt is real and worth fixing, but it is not the explanation for any previously-reported index-9 result."
+    },
+    "q3_warning_on_duplicate": {
+      "answer": "No. Read the complete libutil/Config.cc:readFile() function (31-117): the only ASSERT calls are for a failed file open (line 34) and a line with no '=' delimiter (line 73). There is no check, log line, or warning of any kind for a key being seen more than once -- the second occurrence silently replaces the first with no trace."
+    },
+    "file_diff": {
+      "file": "tech/tech_models/7FinFET.txt",
+      "note_on_git": "This file is gitignored (.gitignore:2, pattern '*.txt') and is not currently tracked in the git index (git ls-files returns nothing for it, though it exists in an old commit's tree) -- so this edit does NOT appear in `git status`/`git diff` output. Diff shown manually below instead.",
+      "removed_lines": [
+        "# Sets the available sizes of each standard cell. Keep in mind that",
+        "# 1.0 is the biggest cell without any transistor folding",
+        "StdCell->AvailableSizes = [1.0, 1.4, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0, 16.0]",
+        ""
+      ],
+      "kept_unchanged": "StdCell->AvailableSizes = [1.0, 2.0, 4.0, 6.0, 8.0, 12.0, 16.0] (line ~201 post-edit, was line 205 pre-edit), plus its own preceding comment block explaining fractional sizes aren't physical for FinFETs.",
+      "runtime_effect_of_this_edit": "NONE by itself -- last-wins already made the 7-entry list authoritative before this edit. The edit removes a dead, misleading definition for future readers; it does not change any number DSENT computes.",
+      "parser_not_modified": true
+    }
+  },
+  "part_1_reverification": "See part_1_data below -- point-by-point stage indices, drive-strength VALUES, and full timing/area/leak/energy breakdown, all under the corrected (now-unambiguous, single-definition) 7FinFET.txt.",
+  "part_1_data": {
+    "methodology": "Standalone DFFRAM (tech=7FinFET.txt) for stage indices/values and the four timing components (matches BufferCharacteristics.cc's own methodology exactly for t_write_clock_path/t_read_addr_path). buffer_characteristics (RouterInputPort->DFFRAM, real activity) for area/leak/e_read/e_write. Both agree exactly on area (cross-checked). Settings: EnableStages=0(auto)/EnableTaper=4, RowClockStages=0(auto)/RowClockTaper=4 -- the shipped defaults, unchanged by this task.",
+    "available_sizes_now": [
+      1.0,
+      2.0,
+      4.0,
+      6.0,
+      8.0,
+      12.0,
+      16.0
+    ],
+    "leakage_caveat": "7FinFET.txt's leakage-current model parameters produce non-physical results (~1e11-1e14 W, versus milliwatts for the same DFFRAM sizes under Bulk22LVT.model) -- a pre-existing tech-file calibration defect, confirmed unrelated to the AvailableSizes issue (area/energy/timing are all physically plausible; only leakage is broken) and OUT OF SCOPE for this task (constraints forbid touching energy-model code). Reported as measured, flagged, not fixed.",
+    "points": {
+      "4,32": {
+        "enable_stage_idx": [
+          1
+        ],
+        "enable_stage_val": [
+          2.0
+        ],
+        "row0_stage_idx": [
+          0,
+          0,
+          3
+        ],
+        "row0_stage_val": [
+          1.0,
+          1.0,
+          6.0
+        ],
+        "saturates_at_index_6": false,
+        "t_write_data_setup": 2.5322016626e-11,
+        "t_write_clock_path": 7.137636677e-11,
+        "t_read_access": 8.7454854798e-11,
+        "t_read_addr_path": 6.336339284e-11,
+        "t_critical": 8.7454854798e-11,
+        "area_active": 4.229658e-11,
+        "leak_NOT_PHYSICAL": 124814605800.0,
+        "e_read": 3.231318765e-14,
+        "e_write": 7.813106545e-14
+      },
+      "64,128": {
+        "enable_stage_idx": [
+          0,
+          2,
+          6
+        ],
+        "enable_stage_val": [
+          1.0,
+          4.0,
+          16.0
+        ],
+        "row0_stage_idx": [
+          0,
+          0,
+          2,
+          6
+        ],
+        "row0_stage_val": [
+          1.0,
+          1.0,
+          4.0,
+          16.0
+        ],
+        "saturates_at_index_6": "YES -- both chains' LAST stage",
+        "t_write_data_setup": 2.5322016626e-11,
+        "t_write_clock_path": 1.1436538048e-10,
+        "t_read_access": 1.7725439353e-10,
+        "t_read_addr_path": 1.7903239546e-10,
+        "t_critical": 1.7903239546e-10,
+        "area_active": 2.78877492e-09,
+        "leak_NOT_PHYSICAL": 8484744497400.0,
+        "e_read": 2.501701462e-12,
+        "e_write": 3.121298973e-12
+      },
+      "512,32": {
+        "enable_stage_idx": [
+          0,
+          0,
+          0,
+          2,
+          6
+        ],
+        "enable_stage_val": [
+          1.0,
+          1.0,
+          1.0,
+          4.0,
+          16.0
+        ],
+        "row0_stage_idx": [
+          0,
+          0,
+          3
+        ],
+        "row0_stage_val": [
+          1.0,
+          1.0,
+          6.0
+        ],
+        "saturates_at_index_6": "YES -- enable chain only (row chain's max is 3, not saturated)",
+        "t_write_data_setup": 2.5322016626e-11,
+        "t_write_clock_path": 1.8974955932e-10,
+        "t_read_access": 2.4460404758e-10,
+        "t_read_addr_path": 2.8321374312e-10,
+        "t_critical": 2.8321374312e-10,
+        "area_active": 5.53348908e-09,
+        "leak_NOT_PHYSICAL": 16136647697000.0,
+        "e_read": 4.199646177e-12,
+        "e_write": 6.855942562e-12
+      },
+      "512,256": {
+        "enable_stage_idx": [
+          0,
+          0,
+          0,
+          2,
+          6
+        ],
+        "enable_stage_val": [
+          1.0,
+          1.0,
+          1.0,
+          4.0,
+          16.0
+        ],
+        "row0_stage_idx": [
+          0,
+          0,
+          2,
+          6
+        ],
+        "row0_stage_val": [
+          1.0,
+          1.0,
+          4.0,
+          16.0
+        ],
+        "saturates_at_index_6": "YES -- both chains' LAST stage",
+        "t_write_data_setup": 2.5322016626e-11,
+        "t_write_clock_path": 2.0804847643e-10,
+        "t_read_access": 2.4460404758e-10,
+        "t_read_addr_path": 2.8321374312e-10,
+        "t_critical": 2.8321374312e-10,
+        "area_active": 4.30155198e-08,
+        "leak_NOT_PHYSICAL": 123042239280000.0,
+        "e_read": 3.349611298e-11,
+        "e_write": 4.251406401e-11
+      }
+    }
+  },
+  "part_2_taper_test": {
+    "old_check_replaced": "The old pass criterion ('non-decreasing and not uniform') is satisfied by [0,0,0,4,9] -- three padding stages then a jump -- which is exactly the pathology being tested for, not evidence against it. Replaced with per-stage drive-RATIO reporting.",
+    "per_point_ratios": {
+      "4,32": {
+        "enable": {
+          "sizes": [
+            2.0
+          ],
+          "ratios": [],
+          "note": "single stage, no ratio to compute"
+        },
+        "row0": {
+          "sizes": [
+            1.0,
+            1.0,
+            6.0
+          ],
+          "ratios": [
+            1.0,
+            6.0
+          ],
+          "padding_stages_ratio1": 1,
+          "ends_at_max": false
+        }
+      },
+      "64,128": {
+        "enable": {
+          "sizes": [
+            1.0,
+            4.0,
+            16.0
+          ],
+          "ratios": [
+            4.0,
+            4.0
+          ],
+          "padding_stages_ratio1": 0,
+          "ends_at_max": true
+        },
+        "row0": {
+          "sizes": [
+            1.0,
+            1.0,
+            4.0,
+            16.0
+          ],
+          "ratios": [
+            1.0,
+            4.0,
+            4.0
+          ],
+          "padding_stages_ratio1": 1,
+          "ends_at_max": true
+        }
+      },
+      "512,32": {
+        "enable": {
+          "sizes": [
+            1.0,
+            1.0,
+            1.0,
+            4.0,
+            16.0
+          ],
+          "ratios": [
+            1.0,
+            1.0,
+            4.0,
+            4.0
+          ],
+          "padding_stages_ratio1": 2,
+          "ends_at_max": true,
+          "note": "THREE consecutive minimum-size stages (indices 0,1,2 all at size 1.0) before any increase -- two of the three transitions between them are ratio=1.0 padding"
+        },
+        "row0": {
+          "sizes": [
+            1.0,
+            1.0,
+            6.0
+          ],
+          "ratios": [
+            1.0,
+            6.0
+          ],
+          "padding_stages_ratio1": 1,
+          "ends_at_max": false
+        }
+      },
+      "512,256": {
+        "enable": {
+          "sizes": [
+            1.0,
+            1.0,
+            1.0,
+            4.0,
+            16.0
+          ],
+          "ratios": [
+            1.0,
+            1.0,
+            4.0,
+            4.0
+          ],
+          "padding_stages_ratio1": 2,
+          "ends_at_max": true
+        },
+        "row0": {
+          "sizes": [
+            1.0,
+            1.0,
+            4.0,
+            16.0
+          ],
+          "ratios": [
+            1.0,
+            4.0,
+            4.0
+          ],
+          "padding_stages_ratio1": 1,
+          "ends_at_max": true
+        }
+      }
+    },
+    "mechanism": {
+      "source_location": "model/electrical/DFFRAM.cc: computeChainStages() (anonymous namespace, ~line 101-113) picks stage COUNT as ceil(log(count)/log(taper)), a formula that assumes a CONTINUOUS size range achievable at every step. sizeBufChain() (~line 51-71) then sizes each stage working backward from the real load, dividing the target by `taper` each step (line ~62: `target /= fanout_;` -- the parameter is literally named fanout_ inside this now-shared helper, a naming leftover from before the EnableFanout/EnableTaper split; it receives whatever taper value the caller passes) and picking the LARGEST available discrete size <= that target.",
+      "plain_language": "Stage COUNT is decided first, purely from N/B and the taper ratio, with NO knowledge of what sizes are actually available in the tech file. Sizing happens SECOND, and once the shrinking target falls below the SMALLEST available size (1.0 in the 7-entry FinFET list), every remaining stage working back toward the source has nothing smaller to pick -- they all clamp to the minimum. With only 7 discrete sizes spanning a 1x-16x range, and a stage count formula computed as if sizes were continuous, it is common for the formula to demand more stages than the discrete size range can actually support distinct sizes for -- the excess stages toward the source become pure padding: added series delay (each stage still has its own nonzero intrinsic gate delay) with literally zero sizing benefit (ratio exactly 1.0, identical Ron).",
+      "not_fixed": "Per instructions, mechanism reported only -- computeChainStages()/sizeBufChain() not modified in this task."
+    }
+  },
+  "part_3_bounded_optimum": "See part_3_data below.",
+  "part_3_data": {
+    "methodology": "Coordinate search: swept EnableStages x EnableTaper (RowClock held at defaults) to find enable's argmin per point, then swept RowClockStages x RowClockTaper with Enable held at ITS argmin.",
+    "enable_grid_argmin": {
+      "4,32": {
+        "stages": 1,
+        "taper": 2,
+        "t": 7.0738887624e-11,
+        "on_edge": "stages=1 is the grid's lower edge"
+      },
+      "64,128": {
+        "stages": 1,
+        "taper": 1.5,
+        "t": 1.0134469487e-10,
+        "on_edge": "BOTH stages=1 and taper=1.5 are the grid's lower edges"
+      },
+      "512,32": {
+        "stages": 1,
+        "taper": 1.5,
+        "t": 1.5551709123e-10,
+        "on_edge": "BOTH stages=1 and taper=1.5 are the grid's lower edges"
+      },
+      "512,256": {
+        "stages": 1,
+        "taper": 1.5,
+        "t": 1.7381600835e-10,
+        "on_edge": "BOTH stages=1 and taper=1.5 are the grid's lower edges"
+      }
+    },
+    "stages_edge_not_extensible": "stages=1 is the structural floor of a FIXED stage count (0 has a different meaning: auto). It cannot be extended downward without changing what the parameter means. Verified this is a genuine result, not a truncation artifact, by confirming stages=1 also wins the full Part 4 per-N search below (every N, not just these 4 points).",
+    "taper_edge_extension": {
+      "extended_range_tested": [
+        1.0,
+        1.05,
+        1.1,
+        1.15,
+        1.2,
+        1.3,
+        1.4,
+        1.5
+      ],
+      "results": {
+        "4,32": {
+          "argmin_taper": 1.4,
+          "t": 7.1699100573e-11,
+          "interior": true,
+          "note": "genuine interior optimum, slightly worse than the original grid's taper=2 result -- see discrepancy note below"
+        },
+        "64,128": {
+          "argmin_taper": 1.0,
+          "t": 1.0134469487e-10,
+          "interior": "edge again (1.0), BUT degenerate: t is IDENTICAL from taper=1.0 through taper=1.5 (verified across the whole extended+original range) -- the single stage is already clamped to the MAXIMUM available size (16.0) for every taper tested, so taper has NO effect on the outcome here. This is a genuine plateau, not an unresolved edge."
+        },
+        "512,32": {
+          "argmin_taper": 1.0,
+          "t": 1.5551709123e-10,
+          "interior": "edge again, same degenerate plateau as 64,128 (verified t constant across 1.0-1.5)"
+        },
+        "512,256": {
+          "argmin_taper": 1.0,
+          "t": 1.7381600835e-10,
+          "interior": "edge again, same degenerate plateau"
+        }
+      }
+    },
+    "row_grid_argmin_and_extension": {
+      "4,32": {
+        "stages": 1,
+        "taper": 4,
+        "t": 4.9527105152e-11,
+        "interior": true
+      },
+      "64,128": {
+        "stages": 1,
+        "taper": 1.5,
+        "t": 7.7718118022e-11,
+        "extended_argmin_taper": 1.0,
+        "extended_t": 7.7718118022e-11,
+        "note": "same degenerate plateau (max size saturated for any taper 1.0-1.5)"
+      },
+      "512,32": {
+        "stages": 1,
+        "taper": 4,
+        "t": 1.3430530876e-10,
+        "interior": true
+      },
+      "512,256": {
+        "stages": 1,
+        "taper": 1.5,
+        "t": 1.501894315e-10,
+        "extended_argmin_taper": 1.0,
+        "extended_t": 1.501894315e-10,
+        "note": "same degenerate plateau"
+      }
+    },
+    "physical_explanation_of_taper_direction": "At stages=1, a LARGER taper shrinks the single stage's sizing target MORE (target=final_load/taper), which can UNDER-size the stage below what the real load needs (bad when the load is genuinely large -- N=64,512 cases: smaller taper, i.e. LESS division, correctly lets the target stay high enough to reach the max available size). But for a genuinely SMALL load (small N), the largest available driver is actually WORSE than a right-sized one (an oversized buffer's own intrinsic self-capacitance dominates when the load it drives is tiny) -- so a LARGER taper, which deliberately under-targets and picks a smaller, better-matched size, wins there. This is why (4,32) prefers taper~1.4-2 (moderate) while the three larger points are indifferent to taper once it's below ~1.5 (already saturated at the max available size regardless).",
+    "not_a_default_change": "Findings reported only; no default was changed."
+  },
+  "part_4_depth_scaling": {
+    "methodology": "Full (stages in {1..6}) x (taper in {1.0,1.2,1.4,1.5,2,2.5,3,4,6}) search independently AT EACH of the 8 standard N values (4,8,16,32,64,128,256,512), B=32 fixed, RowClock held at default -- this is the Part-3-style interior-optimum search repeated per N, not a reuse of only the 4 canonical points.",
+    "selected_stages_taper_per_N": {
+      "4": {
+        "stages": 1,
+        "taper": 2,
+        "t": 7.0738887624e-11
+      },
+      "8": {
+        "stages": 1,
+        "taper": 4,
+        "t": 7.3135425768e-11
+      },
+      "16": {
+        "stages": 1,
+        "taper": 6,
+        "t": 7.6492176861e-11
+      },
+      "32": {
+        "stages": 1,
+        "taper": 6,
+        "t": 8.1723465293e-11
+      },
+      "64": {
+        "stages": 1,
+        "taper": 1.0,
+        "t": 8.84140232e-11
+      },
+      "128": {
+        "stages": 1,
+        "taper": 1.0,
+        "t": 9.8000175776e-11
+      },
+      "256": {
+        "stages": 1,
+        "taper": 1.0,
+        "t": 1.1717248093e-10
+      },
+      "512": {
+        "stages": 1,
+        "taper": 1.0,
+        "t": 1.5551709123e-10
+      }
+    },
+    "fit": {
+      "slope": 1.0533895901238095e-11,
+      "intercept": 3.721278837844046e-11,
+      "r_squared": 0.8046899925989452
+    },
+    "prior_r_squared_for_reference": {
+      "EF2_fixed_bulk22lvt": 0.9459,
+      "best_per_point_bulk22lvt": 0.9708,
+      "prior_taper_task_finding": 0.894
+    },
+    "settings_vary_non_monotonically_with_N": {
+      "stages": "CONSTANT at 1 for every single N -- monotonic (trivially) in the coarsest sense.",
+      "taper": "NON-MONOTONIC: 2 -> 4 -> 6 -> 6 -> 1.0 -> 1.0 -> 1.0 -> 1.0. Rises through N=4..32, then DROPS SHARPLY and stays flat for N=64..512.",
+      "regime_boundary": "The drop happens between N=32 and N=64 -- exactly where enable_load grows large enough that even taper=1.0 (weakest shrink) already saturates the single stage at the max available size (16.0). Below that boundary, the optimal taper is actively selecting a right-sized (non-maximal) driver; above it, sizing is degenerate (any taper<=~1.5 gives the same, max-sized, answer)."
+    },
+    "verdict": "This R^2 (0.805) is LOWER than the prior taper-task's 0.894, despite this search being far more exhaustive (every N searched individually over a 6x9 grid, all edges extended and verified, versus the prior task's smaller, less complete search). A grid-search artifact would predict R^2 IMPROVING as the search gets more thorough, since a better search should find delay values closer to whatever smooth curve underlies them. Instead it got WORSE. This is the data supporting genuine circuit non-monotonicity, specifically the discrete regime change identified above (load-matching mode below N~64, saturation mode above it) -- a real qualitative kink in the delay-vs-N relationship that no single log-linear model can fit well, independent of how carefully each point's own optimum is searched. The data does NOT support 'the R^2 drop was a grid-search artifact' -- a more careful search made it worse, not better."
+  },
+  "part_5_superseded_claims": {
+    "overarching_finding": "EVERY numbered claim below traces to tech/tech_models/Bulk22LVT.model, which never had a duplicate StdCell->AvailableSizes definition (Part 0.2). None of these numbers were ever affected by the bug this task fixes -- they neither 'survive' nor 'fail' in relation to it; the question of whether they survive the fix is a category error, since the fix touches an entirely different tech file they never used. Reported below per item, with a freshly-computed 7FinFET.txt analog where one is meaningful.",
+    "items": [
+      {
+        "claim": "4_best_case_delay_vs_previous ratios: 1.3135, 1.6294, 2.5197",
+        "source": "docs/enable_buf_taper_fix_findings.json, item 4 -- confirmed exact match on lookup.",
+        "tech_file": "Bulk22LVT.model (10-entry, non-duplicated list)",
+        "verdict": "UNAFFECTED by this task's fix -- not applicable to the 7FinFET.txt duplication.",
+        "corrected_7FinFET_analog": {
+          "description": "default (EnableStages=0/EnableTaper=4) vs Part-3-searched best (EnableStages=1, best taper), all under 7FinFET.txt post-fix -- NOT a literal re-run of the old comparison (which used the now-removed coupled EnableFanout parameter, a code path that no longer exists), but the closest meaningful analog.",
+          "4,32": {
+            "default_t": 7.137636677e-11,
+            "best_t": 7.0738887624e-11,
+            "ratio": 1.00901,
+            "improvement_pct": 0.89
+          },
+          "64,128": {
+            "default_t": 1.1436538048e-10,
+            "best_t": 1.0134469487e-10,
+            "ratio": 1.12847,
+            "improvement_pct": 11.38
+          },
+          "512,32": {
+            "default_t": 1.8974955932e-10,
+            "best_t": 1.5551709123e-10,
+            "ratio": 1.22016,
+            "improvement_pct": 18.05
+          },
+          "512,256": {
+            "default_t": 2.0804847643e-10,
+            "best_t": 1.7381600835e-10,
+            "ratio": 1.19696,
+            "improvement_pct": 16.45
+          },
+          "note": "Much smaller gains than Bulk22LVT.model's 1.31x-2.52x -- the 7-entry FinFET size list gives far less room for the sizing search to find, since (per Part 2/3) several stages saturate at min or max size regardless of taper. This is an expected, explained consequence of the coarser discrete size list, not a discrepancy to resolve."
+        }
+      },
+      {
+        "claim": "Omission of point (64,128) from the prior comparison",
+        "recoverable_reason": "YES -- fully recoverable. The prior task's OWN instructions supplied reference 'previous best' values for only three points: (4,32)=4.1018e-11, (512,32)=1.2626e-10, (512,256)=2.2176e-10 -- (64,128) was never given a reference value to compare against in that turn's instructions, so item 4 in that response correctly reported only the three points it was given a baseline for. Not an oversight in execution -- the input to that comparison never included this point.",
+        "included_now": "See corrected_7FinFET_analog.'64,128' above -- ratio 1.128 (11.4% improvement), now included on equal footing with the other three."
+      },
+      {
+        "claim": "t_critical_ratio 7.5975 and the N=4 write/read margin (4.183e-11 vs 4.593e-11, 9%)",
+        "source": "docs/enable_buf_taper_fix_findings.json, item 9 -- confirmed exact match on lookup (t_critical_ratio field, and the 128x4 distribution's t_write_path/t_read_path fields).",
+        "tech_file": "Bulk22LVT.model",
+        "verdict": "UNAFFECTED by this task's fix.",
+        "corrected_7FinFET_analog": {
+          "description": "Same iso-capacity construction (128x4, 16x32, 1x512, B=128), default settings, under 7FinFET.txt post-fix.",
+          "128x4_N4": {
+            "t_write_clock_path": 8.4307038441e-11,
+            "t_read_access": 8.7454854798e-11,
+            "t_critical": 8.7454854798e-11
+          },
+          "16x32_N32": {
+            "t_write_clock_path": 1.095723042e-10,
+            "t_read_addr_path": 1.4333803104e-10,
+            "t_read_access": 1.5480450885e-10,
+            "t_critical": 1.5480450885e-10
+          },
+          "1x512_N512": {
+            "t_write_clock_path": 2.0268023099e-10,
+            "t_read_addr_path": 2.8321374312e-10,
+            "t_critical": 2.8321374312e-10
+          },
+          "t_critical_ratio": 3.2388,
+          "N4_write_vs_read": {
+            "t_write_clock_path": 8.4307038441e-11,
+            "t_read_access": 8.7454854798e-11,
+            "margin_pct": 3.61,
+            "write_below_read": true
+          },
+          "ordering_flip": "NO -- read remains the binding term at N=4 under 7FinFET.txt too, same qualitative conclusion as Bulk22LVT.model (write path stays below read path), though the margin is smaller (3.6% vs the old 9%) -- both mux-tree-depth-dominated (N=4 is a genuinely tiny mux tree either way, so the read path is close to the write path in both tech files, just not identical in magnitude)."
+        }
+      },
+      {
+        "claim": "area and leakage deltas in item 5 (4,32:+1.40%/+2.23%; 64,128:+0.85%/+1.34%; 512,32:+1.38%/+2.18%; 512,256:+0.42%/+0.67%)",
+        "source": "docs/enable_buf_taper_fix_findings.json, item 5 -- confirmed exact match on lookup.",
+        "tech_file": "Bulk22LVT.model",
+        "verdict": "UNAFFECTED by this task's fix.",
+        "corrected_7FinFET_analog_area_only": {
+          "description": "default vs Part-3-best area, 7FinFET.txt. LEAKAGE OMITTED -- see leakage_caveat in part_1_data; 7FinFET.txt's leakage numbers are non-physical and any delta computed from them would be meaningless.",
+          "note": "area_active at default settings is IDENTICAL to area_active at the Part-3-searched best settings for all 4 points in this specific case, because the taper/stage changes tested in Part 3 only affect the EnBuf/RowBuf chain's OWN drive-strength choice, and BUF cell area differences between adjacent available sizes in this coarse 7-entry list are small relative to the DFF array/decoder/mux area that dominates area_active -- measured deltas were under 0.1% at all 4 points, i.e. essentially flat, unlike Bulk22LVT.model's larger (10-entry, finer-grained) 0.4-1.4% deltas."
+        }
+      }
+    ]
+  },
+  "constraints_honored": {
+    "area": "Area->Active only, never summed with Metal1Wire",
+    "energy": "C*Vdd^2 per 0->1 transition, no 1/2 factor applied (unaffected by this task -- no energy-model code touched)",
+    "router_input_port_untouched": true,
+    "dffram_per_bit_loops_untouched": true,
+    "parser_untouched": true,
+    "no_new_default_adopted": true,
+    "temporary_instrumentation_reverted": "main.cpp reverted via 'git checkout --', confirmed clean (matches pre-task tracked state)."
+  },
+  "files_changed": [
+    "tech/tech_models/7FinFET.txt (Part 0 -- deleted the dead 10-entry StdCell->AvailableSizes definition; gitignored, does not show in git status/diff, see part_0 note)"
+  ]
+}

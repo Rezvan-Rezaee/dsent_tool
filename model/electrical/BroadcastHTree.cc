@@ -131,14 +131,25 @@ namespace DSENT
 
         createLoad("In_Cap");
         createDelay("In_to_Out_delay");
+        createDriver("Out_Ron", false); // not sizable -- see RepeatedLink.cc's identical pattern
 
         ElectricalLoad* in_cap = getLoad("In_Cap");
         ElectricalDelay* in_to_out_delay = getDelay("In_to_Out_delay");
+        ElectricalDriver* out_ron = getDriver("Out_Ron");
 
         getNet("InTmp")->addDownstreamNode(in_cap);
         in_cap->addDownstreamNode(in_to_out_delay);
+        // Task 2 fix: in_to_out_delay previously had NO downstream node, so
+        // any crit-path walk arriving here (e.g. DFFRAM's from CK) dead-
+        // ended at this tree's own internal delay node and never reached
+        // "OutTmp"/"Out" -- meaning it never continued into whatever this
+        // tree's Out port is portConnect'd to outside. Mirrors
+        // RepeatedLink.cc's identical In_to_Out_delay -> Out_Ron -> OutTmp
+        // chain exactly.
+        in_to_out_delay->addDownstreamNode(out_ron);
+        out_ron->addDownstreamNode(getNet("OutTmp"));
 
-        // Init 
+        // Init
         for(unsigned int i = 0; i < number_levels; ++i)
         {
             StdCell* repeater = getTechModel()->getStdCellLib()->createStdCell("INV", "Repeater" + (String)i);
@@ -333,8 +344,55 @@ namespace DSENT
 
         // Update electrical interfaces
         getLoad("In_Cap")->setLoadCap(m_repeaters_[0]->getNet("A")->getTotalDownstreamCap());
-        // TODO
-        getDelay("In_to_Out_delay")->setDelay(0.0);
+
+        // In_to_Out_delay: each level is modeled as ONE representative
+        // repeated segment (gate + its share of the level's distributed
+        // wire RC, already set via setDistributedCap/Res above) that stands
+        // in for m_number_segments_[i] identical segments cascaded in
+        // series -- the same "one segment's delay x segment count" pattern
+        // RepeatedLink.cc already uses for its own In_to_Out_delay. A fresh
+        // performCritPathExtract() is required here: the sizing loop above
+        // only ever called calculateNodeTransition(), never extract/mark,
+        // so any previously marked critical path is stale (or, on a node
+        // touched for the first time, unset).
+        double total_delay = 0.0;
+        for(unsigned int i = 0; i < number_levels; ++i)
+        {
+            m_timing_trees_[i]->performCritPathExtract(m_repeaters_[i]->getNet("A"));
+            double seg_delay = m_timing_trees_[i]->calculateCritPathDelay(m_repeaters_[i]->getNet("A"));
+            total_delay += seg_delay * m_number_segments_[i];
+        }
+
+        // Leaf buffer stage, added after the per-level tree in series:
+        // LeafHeadDriver's own stage delay (driving m_leaf_head_load_, a
+        // capacitive stand-in sized to match the real chain's input
+        // capacitance -- same modeling shortcut as the per-level
+        // repeater_load_ above) PLUS the real, fully-connected
+        // m_leaf_drivers_ chain's delay. The chain's own internal links
+        // (LeafDriverK.Y -> LeafDriver(K-1).A, ..., LeafDriver1.Y ->
+        // LeafDriver0.A, LeafDriver0.Y -> m_leaf_load_) are real net
+        // connections (addDownstreamNode), not capacitive stand-ins, so a
+        // SINGLE extraction starting from the last-added driver's A net
+        // (m_leaf_drivers_.back(), the stage closest to the head) already
+        // recursively walks every intermediate stage down to LeafDriver0 in
+        // one pass. Extracting from every element individually and summing
+        // would double-count each downstream stage's delay repeatedly.
+        ElectricalTimingTree leaf_head_tree("LeafHeadDelay", m_leaf_head_driver_);
+        leaf_head_tree.performCritPathExtract(m_leaf_head_driver_->getNet("A"));
+        total_delay += leaf_head_tree.calculateCritPathDelay(m_leaf_head_driver_->getNet("A"));
+
+        ElectricalTimingTree leaf_chain_tree("LeafChainDelay", m_leaf_drivers_.back());
+        leaf_chain_tree.performCritPathExtract(m_leaf_drivers_.back()->getNet("A"));
+        total_delay += leaf_chain_tree.calculateCritPathDelay(m_leaf_drivers_.back()->getNet("A"));
+
+        getDelay("In_to_Out_delay")->setDelay(total_delay);
+        // Out_Ron's own resistance, for whatever's portConnect'd downstream
+        // of this tree's "Out" port to size correctly against -- mirrors
+        // RepeatedLink.cc's identical setOutputRes call. LeafDriver0 (index
+        // 0, closest to the real load) is the final stage actually driving
+        // the tree's output; no additional wire term applies here (unlike
+        // RepeatedLink, nothing further is distributed past the leaf load).
+        getDriver("Out_Ron")->setOutputRes(m_leaf_drivers_[0]->getDriver("Y_Ron")->getOutputRes());
 
         // Reset all the atomic results to 0 before start updating new results
         resetElectricalAtomicResults();

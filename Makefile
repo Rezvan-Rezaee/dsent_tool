@@ -5,8 +5,9 @@ CXX := g++
 CXXFLAGS := -O2 -std=c++11 -Wall
 TARGET := dsent
 
-# Find all C++ source files recursively (.cpp and .cc)
-SRCS := $(shell find . -type f \( -name "*.cpp" -o -name "*.cc" \))
+# Find all C++ source files recursively (.cpp and .cc), excluding the
+# vendored contrib/ tree (separate build, has its own deps/entry points)
+SRCS := $(shell find . -path ./contrib -prune -o -type f \( -name "*.cpp" -o -name "*.cc" \) -print)
 OBJS := $(SRCS:.cpp=.o)
 OBJS := $(OBJS:.cc=.o)
 

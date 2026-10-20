@@ -1,0 +1,208 @@
+{
+  "task": "Fix the clock-path delay in DSENT so t_write_clock_path is a real number",
+  "status": "All 3 tasks implemented, built cleanly, and validated with real measurements (standalone-DFFRAM methodology, matching dffram_clock_distribution_validation_results.txt's own established approach).",
+  "files_changed": [
+    "model/electrical/BroadcastHTree.cc"
+  ],
+  "task_1_implement_in_to_out_delay": {
+    "location": "BroadcastHTree::updateModel(), replacing the setDelay(0.0) TODO",
+    "implementation": "Sums, per level i, m_timing_trees_[i]->performCritPathExtract() then calculateCritPathDelay() on m_repeaters_[i]->getNet(\"A\") (a fresh performCritPathExtract is required first -- the sizing loop above only ever calls calculateNodeTransition(), never marks a critical path, so any prior mark is stale), each times m_number_segments_[i] -- exactly RepeatedLink.cc's own established 'one segment's delay x segment count' pattern for its own In_to_Out_delay. Then adds the leaf-buffer stage: LeafHeadDriver's own delay (extract from its A net) plus ONE extraction from m_leaf_drivers_.back() (the last-added, head-adjacent stage) -- since the real m_leaf_drivers_ chain is genuinely, fully connected node-to-node via addDownstreamNode (LeafDriverK.Y -> LeafDriver(K-1).A -> ... -> LeafDriver0.A -> LeafDriver0.Y -> m_leaf_load_), a single extraction from the outermost element already recursively walks every intermediate stage in one pass. A naive per-element loop (extracting from every m_leaf_drivers_[i] separately and summing) would have double-counted every downstream stage repeatedly -- deliberately NOT done that way.",
+    "scope_honored": "Confined to updateModel(); no repeater sizing, segment counts, area, or energy code touched."
+  },
+  "task_2_path_continuity": {
+    "diagnosis_confirmed": "BroadcastHTree's own 'OutTmp'/'Out' port net was never connected to anything real. constructModel() only had getNet(\"InTmp\")->addDownstreamNode(in_cap); in_cap->addDownstreamNode(in_to_out_delay); -- in_to_out_delay had ZERO downstream nodes registered anywhere in the file, so any crit-path walk arriving there (e.g. from DFFRAM's CK) dead-ended at the tree's own internal delay node and never reached OutTmp/Out, hence never continued into whatever the tree's Out port is portConnect'd to outside (DFFRAM's NAND2_CKGate1_i array).",
+    "found_via": "Direct comparison against RepeatedLink.cc, which has the structurally identical InTmp -> In_Cap -> In_to_Out_delay chain PLUS two extra lines BroadcastHTree.cc was missing: in_to_out_delay->addDownstreamNode(out_ron); out_ron->addDownstreamNode(getNet(\"OutTmp\"));",
+    "fix": "Added the same createDriver(\"Out_Ron\", false) + addDownstreamNode chain in constructModel(), and getDriver(\"Out_Ron\")->setOutputRes(m_leaf_drivers_[0]->getDriver(\"Y_Ron\")->getOutputRes()) in updateModel() (LeafDriver0, index 0, is the final stage actually driving the tree's output -- no additional wire term needed unlike RepeatedLink's genuinely wire-terminated case).",
+    "verified_node_sequence_N512_B256_fanout4": [
+      "CK",
+      "NAND2_CKGate0(A_to_Y_delay, Y_Ron)",
+      "INV_CKGate0(A_to_Y_delay, Y_Ron)",
+      "EnableTree.In -> InTmp -> In_Cap -> In_to_Out_delay(1.72815e-10s, now real, was 0) -> Out_Ron(5.20515e-10s) -> OutTmp -> DriverMultiplier -> Out",
+      "NAND2_CKGate1_0(A_to_Y_delay, Y_Ron)",
+      "INV_CKGate1_0(A_to_Y_delay, Y_Ron)",
+      "RowBuf0_0 -> RowBuf0_1 -> RowBuf0_2 -> RowBuf0_3 (4 stages, matches RowClockFanout=4)",
+      "DFF_0.CK"
+    ],
+    "exactly_matches_expected_sequence": true,
+    "instrumentation_method": "Standalone diagnostic (built DFFRAM directly, ran ElectricalTimingTree::performCritPathExtract(getNet(\"CK\")), then walked the marked crit path via getCritPath()/getDownstreamNodes(), printing each node's type/model/instance/delay). Confirmed the walk no longer stops at the tree -- it continues all the way through to the DFF's CK pin and beyond (into CK_to_Q_delay and the read-mux tree, since an unrestricted extraction from CK finds the globally longest path, not just the write-clock segment)."
+  },
+  "task_3_buf_chain_continuity": {
+    "finding": "Already correctly wired -- CONFIRMED, no fix needed.",
+    "evidence": "DFFRAM.cc's RowBuf chain (and NAND2_CKGate1_i, INV_CKGate1_i, DFF CK pins) are all connected via portConnect(), and ElectricalModel::portConnect() (model/ElectricalModel.cc lines 188-239) calls addDownstreamNode() internally for both the input and output port cases -- verified by direct code inspection, and empirically confirmed by Task 2's node-sequence walk, which shows RowBuf0_0 through RowBuf0_3 correctly chained with real per-stage A_to_Y_delay/Y_Ron contributions, ending at DFF_0.CK."
+  },
+  "validation": {
+    "1_absolute_plausibility": {
+      "description": "t_write_clock_path and implied per-stage delay (total / count of named stages: NAND2_CKGate0 + INV_CKGate0 + EnableTree(lumped as 1) + NAND2_CKGate1_i + INV_CKGate1_i + RowBuf chain, i.e. 5 + n_buf_stages).",
+      "points": [
+        {
+          "N": 4,
+          "B": 32,
+          "t_write_clock_path": 5.487546e-11,
+          "named_stages": 8,
+          "per_stage": 6.859e-12,
+          "note": "borderline -- just above the ~5ps truncation-suspicion floor; N=4 has only ceil(log2(4))=2 tree levels, so the tree itself contributes little at this size."
+        },
+        {
+          "N": 64,
+          "B": 128,
+          "t_write_clock_path": 2.086575e-10,
+          "named_stages": 10,
+          "per_stage": 2.087e-11
+        },
+        {
+          "N": 512,
+          "B": 32,
+          "t_write_clock_path": 6.47389e-10,
+          "named_stages": 8,
+          "per_stage": 8.092e-11
+        },
+        {
+          "N": 512,
+          "B": 256,
+          "t_write_clock_path": 8.288274e-10,
+          "named_stages": 9,
+          "per_stage": 9.209e-11
+        }
+      ],
+      "conclusion": "3 of 4 points comfortably clear tens-of-ps per stage; the smallest (N=4,B=32) is right at the boundary but architecturally explained by the tree having only 2 levels there, not evidence of truncation (Task 2's node-sequence walk independently confirms full path continuity for this exact case)."
+    },
+    "2_depth_scaling": {
+      "description": "t_write_clock_path vs log2(N) at B=32, N=4..512 (RowClockFanout=4).",
+      "points": [
+        {
+          "N": 4,
+          "t": 5.487546e-11
+        },
+        {
+          "N": 8,
+          "t": 6.366779e-11
+        },
+        {
+          "N": 16,
+          "t": 7.734928e-11
+        },
+        {
+          "N": 32,
+          "t": 1.004672e-10
+        },
+        {
+          "N": 64,
+          "t": 1.418057e-10
+        },
+        {
+          "N": 128,
+          "t": 2.185819e-10
+        },
+        {
+          "N": 256,
+          "t": 3.647166e-10
+        },
+        {
+          "N": 512,
+          "t": 6.47389e-10
+        }
+      ],
+      "fit": {
+        "slope": 7.283185e-11,
+        "intercept": -1.919685e-10,
+        "r_squared": 0.755149
+      },
+      "conclusion": "Positive slope (7.28e-11 s/log2-doubling), confirming Task 1/2 took effect -- before this fix the fit was EXACTLY flat (slope=0, per the stored Phase 4 validation file). R^2=0.755 is moderate, not excellent -- the relationship is positive and monotonic but not perfectly log-linear (visible in the raw points: growth accelerates at large N, consistent with the leaf fanout stage's own load scaling with N)."
+    },
+    "3_row_clock_fanout_0_vs_4": {
+      "description": "Direction was not assumed -- measured directly at both required points.",
+      "points": [
+        {
+          "config": "(N=4,B=32)",
+          "fanout_0": 4.00776e-11,
+          "fanout_4": 5.487546e-11,
+          "delta_pct": 36.9,
+          "dominant_effect": "Added BUF stage delay DOMINATES over reduced per-stage load -- fanout=4 is SLOWER."
+        },
+        {
+          "config": "(N=512,B=256)",
+          "fanout_0": 8.089379e-10,
+          "fanout_4": 8.288274e-10,
+          "delta_pct": 2.46,
+          "dominant_effect": "Same direction (fanout=4 slower), but a much smaller relative effect -- n_buf_stages depends only on B and RowClockFanout (ceil(log(B)/log(RowClockFanout))), not on N, so the BUF chain's absolute delay add-on is roughly size-independent while the total path delay grows with N, shrinking its relative share."
+        }
+      ],
+      "conclusion": "At both measured points, inserting the fanout-4 BUF chain makes t_write_clock_path WORSE, not better -- added series-stage delay outweighs the reduced per-stage fanout load in this specific sizing regime. This is a real, measured result, not assumed in either direction as instructed. RowClockFanout=0/4 are also now DIFFERENT at every point (previously identical, per the stored Phase 4 file) -- Task 1/2 fixed exactly the described symptom."
+    },
+    "4_before_after_vs_pre_phase_4_baseline": {
+      "description": "Pre-Phase-4 unbuffered baseline values (given, from the stored Phase 4 validation run) vs this fix's real numbers.",
+      "points": [
+        {
+          "config": "(4,32)",
+          "before": 7.217e-11,
+          "after": 5.487546e-11,
+          "ratio_before_over_after": 1.315,
+          "still_faster": true
+        },
+        {
+          "config": "(512,32)",
+          "before": 6.746e-10,
+          "after": 6.47389e-10,
+          "ratio_before_over_after": 1.042,
+          "still_faster": true
+        },
+        {
+          "config": "(512,256)",
+          "before": 7.652e-10,
+          "after": 8.288274e-10,
+          "ratio_before_over_after": 0.923,
+          "still_faster": false
+        }
+      ],
+      "headline_finding_flagged_prominently": "At (512,256) the fixed, tree-inclusive path is now SLOWER than the ORIGINAL pre-Phase-4 (single ungated gate, no tree, no BUF chain) baseline -- a ratio of 0.923x, i.e. a real regression, not an improvement. This is reported exactly as measured, not adjusted: the task explicitly forbids changing repeater sizing or NumberLevels defaults, and this result is a direct, honest consequence of finally exposing the tree's own real latency (previously hardcoded to 0, silently hiding this outcome). At (4,32) and (512,32) the buffered version is still faster, but only by 1.3x and 1.04x respectively -- nowhere near the previously-reported 12.8x-119.7x, and even short of the 'plausible few-fold' the task anticipated. Plausible explanation (not verified further, out of this task's scope to fix): ck_tree_levels = ceil(log2(NumberEntries)) reuses Router.cc's router-wide H-tree level formula for a much smaller-scope 'EnableTree' that only fans out within one DFFRAM instance -- 9 levels for N=512 may be structurally oversized for this specific, narrower use, which is a pre-existing Phase 4 sizing decision, not something introduced or alterable by this delay-only fix."
+    },
+    "5_area_leakage_energy_unchanged": {
+      "description": "Diffed against the stored Phase 4 (pre-this-fix) reference numbers in dffram_clock_distribution_validation_results.txt.",
+      "points": [
+        {
+          "config": "(4,32)",
+          "area_match": true,
+          "e_read_match": true,
+          "e_idle_match": true,
+          "area": 2.489626e-10,
+          "e_read": 4.277821e-14,
+          "e_idle": 2.973685e-14
+        },
+        {
+          "config": "(64,128)",
+          "area_match": true,
+          "e_read_match": true,
+          "e_idle_match": true,
+          "area": 1.556113e-08,
+          "e_read": 2.95235e-12,
+          "e_idle": 1.254721e-12
+        },
+        {
+          "config": "(512,32)",
+          "area_match": true,
+          "e_read_match": true,
+          "e_idle_match": true,
+          "area": 3.155607e-08,
+          "e_read": 5.767375e-12,
+          "e_idle": 3.752504e-12
+        },
+        {
+          "config": "(512,256)",
+          "area_match": true,
+          "e_read_match": true,
+          "e_idle_match": true,
+          "area": 2.453893e-07,
+          "e_read": 4.6139e-11,
+          "e_idle": 1.751556e-11
+        }
+      ],
+      "conclusion": "Bit-for-bit identical to full double precision at every point, for area, e_read, and Idle energy -- confirms this fix touched delay only, exactly as required. e_write and leakage were not separately tracked in the stored pre-fix reference file, but are structurally guaranteed unaffected by the same reasoning: no Result/Energy/NddPower computation code was touched anywhere in this change, only the timing-graph delay path (createDriver/addDownstreamNode/setDelay/setOutputRes calls, none of which feed area or power accounting)."
+    }
+  },
+  "constraints_honored": {
+    "area": "Area->Active only, never summed with Metal1Wire",
+    "energy": "Untouched by this change -- C*Vdd^2 semantics unaffected",
+    "sizing": "No repeater sizing, segment counts, NumberLevels defaults, or energy path code modified",
+    "output_format": "JSON"
+  }
+}

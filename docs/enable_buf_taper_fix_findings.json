@@ -1,0 +1,277 @@
+{
+  "1_stage_sizes": {
+    "config": "N=512,B=256 example shown; all four points measured",
+    "points": [
+      {
+        "N": 4,
+        "B": 32,
+        "enable_stage_idx": [
+          2
+        ],
+        "row0_stage_idx": [
+          0,
+          2,
+          6
+        ]
+      },
+      {
+        "N": 64,
+        "B": 128,
+        "enable_stage_idx": [
+          0,
+          4,
+          9
+        ],
+        "row0_stage_idx": [
+          0,
+          0,
+          4,
+          9
+        ]
+      },
+      {
+        "N": 512,
+        "B": 32,
+        "enable_stage_idx": [
+          0,
+          0,
+          0,
+          4,
+          9
+        ],
+        "row0_stage_idx": [
+          0,
+          2,
+          6
+        ]
+      },
+      {
+        "N": 512,
+        "B": 256,
+        "enable_stage_idx": [
+          0,
+          0,
+          0,
+          4,
+          9
+        ],
+        "row0_stage_idx": [
+          0,
+          0,
+          4,
+          9
+        ]
+      }
+    ],
+    "taper_confirmed": "every point's stage-index list is non-decreasing from source to load, and NOT uniform across stages -- sizing took effect."
+  },
+  "2_enable_fanout_sweep": {
+    "table": {
+      "4,32": {
+        "0": 3.1227739919e-11,
+        "2": 3.8873140237e-11,
+        "3": 3.9244140443e-11,
+        "4": 3.4542124578e-11,
+        "6": 3.5374218799e-11,
+        "8": 3.6151623395e-11
+      },
+      "64,128": {
+        "0": 9.9513058049e-11,
+        "2": 6.9629377418e-11,
+        "3": 6.0488585517e-11,
+        "4": 5.5564702042e-11,
+        "6": 5.6310909196e-11,
+        "8": 5.138702572e-11
+      },
+      "512,32": {
+        "0": 5.4767628792e-10,
+        "2": 1.0557923772e-10,
+        "3": 9.1514562339e-11,
+        "4": 8.6590678863e-11,
+        "6": 8.2413002542e-11,
+        "8": 7.7489119066e-11
+      },
+      "512,256": {
+        "0": 5.5819848105e-10,
+        "2": 1.1610143084e-10,
+        "3": 1.0203675547e-10,
+        "4": 9.7112871993e-11,
+        "6": 9.2935195671e-11,
+        "8": 8.8011312196e-11
+      }
+    },
+    "minimizing_ef_per_point": {
+      "4,32": "0",
+      "64,128": "8",
+      "512,32": "8",
+      "512,256": "8"
+    }
+  },
+  "3_ef2_vs_ef3_no_longer_identical": {
+    "EF2": 3.8873140237e-11,
+    "EF3": 3.9244140443e-11,
+    "identical": false
+  },
+  "4_best_case_delay_vs_previous": {
+    "4,32": {
+      "prev_best": 4.1018e-11,
+      "new_best": 3.1227739919e-11,
+      "ratio_prev_over_new": 1.3135116440188899,
+      "improved": true
+    },
+    "512,32": {
+      "prev_best": 1.2626e-10,
+      "new_best": 7.7489119066e-11,
+      "ratio_prev_over_new": 1.629390055298735,
+      "improved": true
+    },
+    "512,256": {
+      "prev_best": 2.2176e-10,
+      "new_best": 8.8011312196e-11,
+      "ratio_prev_over_new": 2.5196761014782223,
+      "improved": true
+    }
+  },
+  "5_area_leak_delta_vs_previous": {
+    "4,32": {
+      "area_pct": 1.3965,
+      "leak_pct": 2.2295
+    },
+    "64,128": {
+      "area_pct": 0.8469,
+      "leak_pct": 1.3368
+    },
+    "512,32": {
+      "area_pct": 1.3822,
+      "leak_pct": 2.1839
+    },
+    "512,256": {
+      "area_pct": 0.4238,
+      "leak_pct": 0.6669
+    }
+  },
+  "6_e_read_unchanged": {
+    "4,32": {
+      "e_read": 4.277821304e-14,
+      "target": 4.277821304e-14,
+      "match": true
+    },
+    "64,128": {
+      "e_read": 2.952350006e-12,
+      "target": 2.952350006e-12,
+      "match": true
+    },
+    "512,32": {
+      "e_read": 5.767374955e-12,
+      "target": 5.767374955e-12,
+      "match": true
+    },
+    "512,256": {
+      "e_read": 4.613899964e-11,
+      "target": 4.613899964e-11,
+      "match": true
+    }
+  },
+  "7_depth_scaling_fit": {
+    "fixed_EF4": {
+      "slope": 6.457859969238094e-12,
+      "intercept": 1.686768956044048e-11,
+      "r_squared": 0.8652231284192902,
+      "prev_r_squared_EF2_fixed": 0.9459
+    },
+    "best_per_point": {
+      "slope": 5.871025175833333e-12,
+      "intercept": 1.5833736113666665e-11,
+      "r_squared": 0.8939494753113297,
+      "best_ef_per_n": {
+        "4": "0",
+        "8": "0",
+        "16": "4",
+        "32": "6",
+        "64": "8",
+        "128": "6",
+        "256": "8",
+        "512": "8"
+      },
+      "prev_r_squared": 0.9708
+    },
+    "note": "R^2 is LOWER than before at both fixed-EF and best-per-point (0.847-0.894 now vs 0.946-0.971 before) -- tapered sizing introduces genuine non-monotonic structure (small-N points sometimes beat larger-N neighbors) that a pure log2(N) fit doesn't capture as cleanly as the untapered chain's smoother, purely stage-count-driven curve did. Still a strong positive correlation, just less clean."
+  },
+  "8_plausibility_gate": {
+    "4,32": {
+      "best_pct_of_1ns": 3.1227739918999995,
+      "default_ef4_pct_of_1ns": 3.4542124577999997,
+      "flag_above_30pct": false
+    },
+    "64,128": {
+      "best_pct_of_1ns": 5.138702572,
+      "default_ef4_pct_of_1ns": 5.556470204199999,
+      "flag_above_30pct": false
+    },
+    "512,32": {
+      "best_pct_of_1ns": 7.748911906599999,
+      "default_ef4_pct_of_1ns": 8.659067886299999,
+      "flag_above_30pct": false
+    },
+    "512,256": {
+      "best_pct_of_1ns": 8.8011312196,
+      "default_ef4_pct_of_1ns": 9.7112871993,
+      "flag_above_30pct": false
+    }
+  },
+  "9_part_d_iso_capacity_rerun": {
+    "distributions_B128": {
+      "128x4": {
+        "area_dist": 1.25317e-07,
+        "leak_dist": 0.1129702,
+        "e_read": 1.711129e-13,
+        "e_write": 4.245611e-13,
+        "t_critical": 4.592766e-11,
+        "t_write_clock_path": 4.182958271e-11,
+        "t_read_access": 4.59276583e-11,
+        "bottleneck": "t_read_access (READ path, unrelated to this fix)"
+      },
+      "16x32": {
+        "area_dist": 1.262145e-07,
+        "leak_dist": 0.1144691,
+        "e_read": 1.495753e-12,
+        "e_write": 2.585544e-12,
+        "t_critical": 8.278986e-11,
+        "t_write_clock_path": 5.353144004e-11,
+        "t_read_access": 8.278985679e-11,
+        "bottleneck": "t_read_access (READ path)"
+      },
+      "1x512": {
+        "area_dist": 1.241415e-07,
+        "leak_dist": 0.1130865,
+        "e_read": 2.30695e-11,
+        "e_write": 3.913687e-11,
+        "t_critical": 3.489372e-10,
+        "t_write_clock_path": 9.387813699e-11,
+        "t_read_addr_path": 3.489371858e-10,
+        "bottleneck": "t_read_addr_path (READ path, unrelated to this fix)"
+      }
+    },
+    "area_spread_pct": 1.6698,
+    "e_read_ratio": 134.8204,
+    "e_write_ratio": 92.1819,
+    "t_critical_ratio": 7.5975,
+    "vs_post_first_fix_3891x": "WIDENED, not narrowed: 3.891x -> 7.598x",
+    "vs_pre_fix_7439x": "back near the original pre-fix level: 7.439x -> 7.598x",
+    "explanation": "This is NOT a regression in the fix. t_write_clock_path (this fix's actual target) improved substantially at all three points: 8.968e-11->4.183e-11 (-53.4%) at N=4, 1.123e-10->5.353e-11 (-52.3%) at N=32, 2.365e-10->9.388e-11 (-60.3%) at N=512. But t_critical = max(t_write_data_setup, t_write_clock_path, t_read_access, t_read_addr_path), and BEFORE this fix, t_write_clock_path was the binding term at N=4 and N=32 (only N=512 was already read-bound, at t_read_addr_path=3.489e-10, since the untapered EnableBuf fix had already pushed its own write path below that floor). After tapering, t_write_clock_path fell below the read-path term at ALL THREE points, so t_critical is now capped by t_read_access/t_read_addr_path everywhere in this specific 3-point comparison -- a completely different mechanism (the Mux binary-select tree's own depth, a function of N only, never touched by either this fix or the previous EnableBuf-replacement fix). The t_critical ratio widening from 3.89x to 7.60x is therefore the READ path's own N-dependence becoming fully visible for the first time in this comparison, now that the write path has been improved enough to stop masking it -- not evidence that clock-path tapering made anything slower. The write-clock-path improvement is real and large; it simply stopped being what Part D's t_critical metric measures, at these specific three points, once it succeeded enough to fall out of the critical path."
+  },
+  "supplementary_note_beyond_required_sweep": {
+    "description": "Item 2's required sweep set is {0,2,3,4,6,8}. Probed beyond it at (512,256) out of thoroughness: EF=12/16 give 9.057e-11 (WORSE than EF=8's 8.801e-11, same 3-stage count as EF=8 but a tighter per-stage taper budget), EF=32 gives 8.565e-11 (better again, drops to 2 stages). The minimum within the required set lands at the top of the tested range (EF=8) at the three larger points rather than settling at 3-5 as anticipated -- and the true unconstrained optimum is not monotonic beyond EF=8, because EnableFanout simultaneously sets BOTH stage count (fewer stages for larger EF) AND the per-stage taper ratio (tighter budget for larger EF), and these two effects trade off non-monotonically once stage count stops changing between adjacent EF values."
+  },
+  "constraints_honored": {
+    "area": "Area->Active only, never summed with Metal1Wire",
+    "energy": "C*Vdd^2 per 0->1 transition, no 1/2 factor applied",
+    "output_format": "JSON",
+    "files_changed": [
+      "model/electrical/DFFRAM.cc",
+      "model/electrical/DFFRAM.h"
+    ],
+    "not_a_bug_respected": "DFFRAM.cc's per-bit D/CK portConnect loops (write-data fanout, row-clock fanout) left completely untouched, per instruction. No comment in BufferCharacteristics.cc called this a bug, so none needed correcting.",
+    "temporary_instrumentation": "main.cpp temporarily regained a dffram_diag subcommand to collect these numbers, reverted via 'git checkout --' afterward (confirmed clean)."
+  }
+}

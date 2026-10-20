@@ -59,18 +59,19 @@ namespace DSENT
         addParameterName("WireLayer");
         addParameterName("WireWidthMultiplier", 1.0);
         addParameterName("WireSpacingMultiplier", 1.0);
-        addParameterName("IsPerformTimingOptimization", "TRUE");
+        addParameterName("IsPerformLinkTimingOptimization", "FALSE");
         addParameterName("Repeated", "TRUE");
         addParameterName("StageEffort", 4.0);
         addParameterName("MuxSize", "4");
         addParameterName("NumberOfConnectedGates", "4");
+        addParameterName("Frequency", 1e9);
         return;
     }
 
     void RepeatedLink::initProperties()
     {
         addPropertyName("WireLength");
-        addPropertyName("Delay", 1e9);
+        addPropertyName("Delay", -1.0);
         addPropertyName("IsKeepParity", "TRUE");
         return;
     }
@@ -158,11 +159,13 @@ namespace DSENT
     void RepeatedLink::updateModel()
     {
         unsigned int number_bits = getParameter("NumberBits").toUInt();
-        bool isPerformTimingOptimization = getParameter("IsPerformTimingOptimization").toBool();
+        bool isPerformTimingOptimization = getParameter("IsPerformLinkTimingOptimization").toBool();
 
         // Get properties
         double wire_length = getProperty("WireLength").toDouble();
-        double required_delay = getProperty("Delay").toDouble();
+        double delay_override = getProperty("Delay").toDouble();
+        double frequency = getParameter("Frequency").toDouble();
+        double required_delay = (delay_override > 0.0) ? delay_override : (1.0 / frequency);
         bool isKeepParity = getProperty("IsKeepParity").toBool();
 
         ASSERT(wire_length >= 0, "[Error] " + getInstanceName() +
@@ -199,9 +202,8 @@ namespace DSENT
         delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
 
         // If everything is 0, use number_segments min-sized repeater
-        if (isPerformTimingOptimization) 
+        if (isPerformTimingOptimization)
         {
-            std::cout << "-----& This should not happen!" << std::endl;
             if (wire_length != 0)
             {
                 // Set the initial number of segments based on isKeepParity

@@ -1,0 +1,4 @@
+*.o
+*.txt
+!tech/tech_models/*.txt
+*.md

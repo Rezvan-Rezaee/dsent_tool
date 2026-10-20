@@ -59,6 +59,12 @@ namespace DSENT
             void createCrossbar();
             void createClockTree();
             void createPipelineReg();
+            // Per-output-VC credit state (Phase 3) -- lives at the router's
+            // OUTPUT ports, tracking free space in the DOWNSTREAM router's
+            // buffer. Deliberately separate from createRouterInputPort()
+            // (which is Phase 2's own, untouched input-side state) so the
+            // two are never confused/double-counted.
+            void createOutputVCState();
 
     }; // class Router
 } // namespace DSENT

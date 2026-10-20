@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make)",
+      "Bash(make clean *)",
+      "Bash(./dsent buffer_characteristics --tech tech/tech_models/Bulk45LVT.model --frequency 1e9 --flit-width 64 --vcs-per-vn 4 --bufs-per-vc 8 --out /tmp/buf.json)",
+      "Bash(echo \"EXIT: $?\")",
+      "Read(//tmp/**)",
+      "Bash(python3 -m json.tool /tmp/buf.json)",
+      "Bash(./dsent buffer_characteristics --tech tech/tech_models/Bulk45LVT.model --frequency 1e9,2e9 --flit-width 32,64 --vcs-per-vn 4 --bufs-per-vc 8 --out /tmp/buf_sweep.json)",
+      "Bash(python3 -c ' *)",
+      "Bash(./dsent buffer_characteristics --tech tech/tech_models/Bulk45LVT.model --frequency 50e9 --flit-width 64 --vcs-per-vn 4 --bufs-per-vc 8 --out /tmp/buf_fail.json)",
+      "Bash(python3 -m json.tool /tmp/buf_fail.json)",
+      "Bash(grep -v '\\\\.o$')",
+      "Bash(grep -v '^?? dsent$')",
+      "Bash(./dsent buffer_characteristics --tech tech/tech_models/Bulk45LVT.model --frequency 1e9 --flit-width 64 --vcs-per-vn 4 --bufs-per-vc 8 --out /tmp/buf_after_docs.json)",
+      "Bash(grep -E \"\\\\.md$|docs/\")",
+      "Bash(./dsent buffer_characteristics --tech tech/tech_models/Bulk22LVT.model --frequency 1e9 --num-vns 1 --vcs-per-vn 1 --bufs-per-vc 4 --flit-width 32 --timing-opt false --out /tmp/smoketest.json)",
+      "Bash(python3 *)",
+      "Bash(chmod +x /mnt/c/Users/rezva/Documents/paradox/dsent/scripts/run_dsent_sweep.py)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(python3 /mnt/c/Users/rezva/Documents/paradox/dsent/scripts/run_dsent_sweep.py --config /mnt/c/Users/rezva/Documents/paradox/dsent/scripts/sweep_config.json --depths 4 --widths 32 --outdir /tmp/sweep_test_config2)",
+      "Bash(rm -rf /tmp/sweep_test_config /tmp/sweep_test_config2 /tmp/test_run*.log)",
+      "Bash(cp configs/repeated-link.cfg /tmp/repeated-link-1e9.cfg)",
+      "Bash(sed -i 's/Frequency = 1e9/Frequency = 1e9/' /tmp/repeated-link-1e9.cfg)",
+      "Bash(cp configs/repeated-link.cfg /tmp/repeated-link-4e9.cfg)",
+      "Bash(sed -i 's/Frequency = 1e9/Frequency = 4e9/' /tmp/repeated-link-4e9.cfg)",
+      "Bash(./dsent /tmp/repeated-link-1e9.cfg)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(cp repeated_link_2.csv /tmp/repeated_link_2_1e9.csv)",
+      "Bash(./dsent /tmp/repeated-link-4e9.cfg)",
+      "Bash(cp repeated_link_2.csv /tmp/repeated_link_2_4e9.csv)"
+    ]
+  }
+}

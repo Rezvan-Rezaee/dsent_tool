@@ -1,0 +1,654 @@
+{
+  "meta": {
+    "tech_model": "tech/tech_models/Bulk22LVT.model",
+    "frequency_hz": 6000000000.0,
+    "dsent_git_hash": "a551928ecb0c80ebd2c3b3ac13093e80dfb90ecb",
+    "dsent_tree_dirty": true,
+    "timing_opt": true,
+    "run_timestamp": "2026-08-18T20:33:23.442611+00:00",
+    "assumptions": [
+      "Read energy is linear in depth: DSENT's DFFRAM uses a broadcast-select binary mux tree, so all N-1 MUX2 cells switch per read. A real shallow NoC FIFO would use a shift register or one-hot gated mux with far lower read energy, so DSENT OVERESTIMATES read energy, increasingly with depth.",
+      "Write energy is linear in depth: all N entries' D-input inverters see the shared write bus. This is physically real for a register-file topology."
+    ],
+    "bracket_max_divergence_pct": 1.6350815935340095
+  },
+  "points": [
+    {
+      "depth": 4,
+      "width": 32,
+      "area_um2": 244.73856000000004,
+      "area_per_bit_um2": 1.9120200000000003,
+      "e_read_pJ": 0.047517391074,
+      "e_write_pJ": 0.1051278016,
+      "e_read_per_bit_fJ": 1.4849184710625,
+      "e_write_per_bit_fJ": 3.2852438,
+      "leak_mW": 0.218595222,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.02624601558,
+        "t_write_ns": 0.02624601558,
+        "t_read_access_ns": 0.0459276583,
+        "t_read_addr_path_ns": 0.03111041604,
+        "t_read_ns": 0.0459276583,
+        "t_critical_ns": 0.0459276583,
+        "slack_ns": 0.1207390084
+      }
+    },
+    {
+      "depth": 8,
+      "width": 32,
+      "area_um2": 498.68544,
+      "area_per_bit_um2": 1.94799,
+      "e_read_pJ": 0.099185086577,
+      "e_write_pJ": 0.154443892,
+      "e_read_per_bit_fJ": 3.0995339555312498,
+      "e_write_per_bit_fJ": 4.826371625,
+      "leak_mW": 0.445509843,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.030312539580000002,
+        "t_write_ns": 0.030312539580000002,
+        "t_read_access_ns": 0.058215057800000004,
+        "t_read_addr_path_ns": 0.04522313029,
+        "t_read_ns": 0.058215057800000004,
+        "t_critical_ns": 0.058215057800000004,
+        "slack_ns": 0.10845160890000001
+      }
+    },
+    {
+      "depth": 16,
+      "width": 32,
+      "area_um2": 993.9072000000001,
+      "area_per_bit_um2": 1.9412250000000002,
+      "e_read_pJ": 0.19523115846900002,
+      "e_write_pJ": 0.24933979050000002,
+      "e_read_per_bit_fJ": 6.10097370215625,
+      "e_write_per_bit_fJ": 7.791868453125001,
+      "leak_mW": 0.890416832,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.03844558758,
+        "t_write_ns": 0.03844558758,
+        "t_read_access_ns": 0.0705024573,
+        "t_read_addr_path_ns": 0.06116115929,
+        "t_read_ns": 0.0705024573,
+        "t_critical_ns": 0.0705024573,
+        "slack_ns": 0.09616420936999999
+      }
+    },
+    {
+      "depth": 32,
+      "width": 32,
+      "area_um2": 1973.36832,
+      "area_per_bit_um2": 1.9271175,
+      "e_read_pJ": 0.38060866946099997,
+      "e_write_pJ": 0.4361744737,
+      "e_read_per_bit_fJ": 11.89402092065625,
+      "e_write_per_bit_fJ": 13.630452303125,
+      "leak_mW": 1.772273125,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.05471168358,
+        "t_write_ns": 0.05471168358,
+        "t_read_access_ns": 0.08278985678999999,
+        "t_read_addr_path_ns": 0.08074981778,
+        "t_read_ns": 0.08278985678999999,
+        "t_critical_ns": 0.08278985678999999,
+        "slack_ns": 0.08387680987
+      }
+    },
+    {
+      "depth": 64,
+      "width": 32,
+      "area_um2": 3918.01344,
+      "area_per_bit_um2": 1.9130925,
+      "e_read_pJ": 0.7448722008499999,
+      "e_write_pJ": 0.8069804173,
+      "e_read_per_bit_fJ": 23.277256276562497,
+      "e_write_per_bit_fJ": 25.218138040625,
+      "leak_mW": 3.52621946,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.0692785361,
+        "t_write_ns": 0.0692785361,
+        "t_read_access_ns": 0.09507725629,
+        "t_read_addr_path_ns": 0.1076397353,
+        "t_read_ns": 0.1076397353,
+        "t_critical_ns": 0.1076397353,
+        "slack_ns": 0.05902693139
+      }
+    },
+    {
+      "depth": 128,
+      "width": 32,
+      "area_um2": 7797.335040000001,
+      "area_per_bit_um2": 1.9036462500000002,
+      "e_read_pJ": 1.4689744633500001,
+      "e_write_pJ": 1.5475086759999999,
+      "e_read_per_bit_fJ": 45.905451979687506,
+      "e_write_per_bit_fJ": 48.359646125,
+      "leak_mW": 7.0290481179999995,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.058809392579999994,
+        "t_write_ns": 0.058809392579999994,
+        "t_read_access_ns": 0.1073646558,
+        "t_read_addr_path_ns": 0.13292835449999998,
+        "t_read_ns": 0.13292835449999998,
+        "t_critical_ns": 0.13292835449999998,
+        "slack_ns": 0.03373831217
+      }
+    },
+    {
+      "depth": 256,
+      "width": 32,
+      "area_um2": 15563.412479999999,
+      "area_per_bit_um2": 1.8998306249999999,
+      "e_read_pJ": 2.9155047285399998,
+      "e_write_pJ": 3.02714996,
+      "e_read_per_bit_fJ": 91.10952276687499,
+      "e_write_per_bit_fJ": 94.59843625,
+      "leak_mW": 14.05725197,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.04559356758,
+        "t_write_ns": 0.04559356758,
+        "t_read_access_ns": 0.1196520553,
+        "t_read_addr_path_ns": 0.1439828083,
+        "t_read_ns": 0.1439828083,
+        "t_critical_ns": 0.1439828083,
+        "slack_ns": 0.022683858390000002
+      }
+    },
+    {
+      "depth": 4,
+      "width": 64,
+      "area_um2": 485.33759999999995,
+      "area_per_bit_um2": 1.8958499999999998,
+      "e_read_pJ": 0.09503478214399999,
+      "e_write_pJ": 0.2055932623,
+      "e_read_per_bit_fJ": 1.4849184709999999,
+      "e_write_per_bit_fJ": 3.2123947234375,
+      "leak_mW": 0.434658454,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.03918495558,
+        "t_write_ns": 0.03918495558,
+        "t_read_access_ns": 0.0459276583,
+        "t_read_addr_path_ns": 0.03111041604,
+        "t_read_ns": 0.0459276583,
+        "t_critical_ns": 0.0459276583,
+        "slack_ns": 0.1207390084
+      }
+    },
+    {
+      "depth": 8,
+      "width": 64,
+      "area_um2": 987.9935999999999,
+      "area_per_bit_um2": 1.9296749999999998,
+      "e_read_pJ": 0.198370173277,
+      "e_write_pJ": 0.3013301273,
+      "e_read_per_bit_fJ": 3.099533957453125,
+      "e_write_per_bit_fJ": 4.708283239062499,
+      "leak_mW": 0.885352851,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.04325147958,
+        "t_write_ns": 0.04325147958,
+        "t_read_access_ns": 0.058215057800000004,
+        "t_read_addr_path_ns": 0.04522313029,
+        "t_read_ns": 0.058215057800000004,
+        "t_critical_ns": 0.058215057800000004,
+        "slack_ns": 0.10845160890000001
+      }
+    },
+    {
+      "depth": 16,
+      "width": 64,
+      "area_um2": 1969.82016,
+      "area_per_bit_um2": 1.9236525,
+      "e_read_pJ": 0.390462316969,
+      "e_write_pJ": 0.48657209020000003,
+      "e_read_per_bit_fJ": 6.100973702640625,
+      "e_write_per_bit_fJ": 7.602688909375001,
+      "leak_mW": 1.770102848,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.05138452758,
+        "t_write_ns": 0.05138452758,
+        "t_read_access_ns": 0.0705024573,
+        "t_read_addr_path_ns": 0.06116115929,
+        "t_read_ns": 0.0705024573,
+        "t_critical_ns": 0.0705024573,
+        "slack_ns": 0.09616420936999999
+      }
+    },
+    {
+      "depth": 32,
+      "width": 64,
+      "area_um2": 3911.6774399999995,
+      "area_per_bit_um2": 1.9099987499999997,
+      "e_read_pJ": 0.761217338961,
+      "e_write_pJ": 0.8528511599999999,
+      "e_read_per_bit_fJ": 11.894020921265625,
+      "e_write_per_bit_fJ": 13.325799374999999,
+      "leak_mW": 3.5239286130000003,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.06765062358,
+        "t_write_ns": 0.06765062358,
+        "t_read_access_ns": 0.08278985678999999,
+        "t_read_addr_path_ns": 0.08074981778,
+        "t_read_ns": 0.08278985678999999,
+        "t_critical_ns": 0.08278985678999999,
+        "slack_ns": 0.08387680987
+      }
+    },
+    {
+      "depth": 64,
+      "width": 64,
+      "area_um2": 7770.30144,
+      "area_per_bit_um2": 1.89704625,
+      "e_read_pJ": 1.48974440215,
+      "e_write_pJ": 1.582215513,
+      "e_read_per_bit_fJ": 23.277256283593747,
+      "e_write_per_bit_fJ": 24.722117390624998,
+      "leak_mW": 7.014097348,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.06901652658,
+        "t_write_ns": 0.06901652658,
+        "t_read_access_ns": 0.09507725629,
+        "t_read_addr_path_ns": 0.1076397353,
+        "t_read_ns": 0.1076397353,
+        "t_critical_ns": 0.1076397353,
+        "slack_ns": 0.05902693139
+      }
+    },
+    {
+      "depth": 128,
+      "width": 64,
+      "area_um2": 15480.45312,
+      "area_per_bit_um2": 1.88970375,
+      "e_read_pJ": 2.9379489263500003,
+      "e_write_pJ": 3.0400002610000003,
+      "e_read_per_bit_fJ": 45.90545197421876,
+      "e_write_per_bit_fJ": 47.500004078125,
+      "leak_mW": 14.0011866,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.056866879099999997,
+        "t_write_ns": 0.056866879099999997,
+        "t_read_access_ns": 0.1073646558,
+        "t_read_addr_path_ns": 0.13292835449999998,
+        "t_read_ns": 0.13292835449999998,
+        "t_critical_ns": 0.13292835449999998,
+        "slack_ns": 0.03373831217
+      }
+    },
+    {
+      "depth": 256,
+      "width": 64,
+      "area_um2": 30887.07072,
+      "area_per_bit_um2": 1.8851971875,
+      "e_read_pJ": 5.83100945654,
+      "e_write_pJ": 5.953823568,
+      "e_read_per_bit_fJ": 91.1095227584375,
+      "e_write_per_bit_fJ": 93.02849325,
+      "leak_mW": 27.97548586,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.04642573458,
+        "t_write_ns": 0.04642573458,
+        "t_read_access_ns": 0.1196520553,
+        "t_read_addr_path_ns": 0.1439828083,
+        "t_read_ns": 0.1439828083,
+        "t_critical_ns": 0.1439828083,
+        "slack_ns": 0.022683858390000002
+      }
+    },
+    {
+      "depth": 4,
+      "width": 128,
+      "area_um2": 966.5356800000001,
+      "area_per_bit_um2": 1.8877650000000001,
+      "e_read_pJ": 0.19006956428400001,
+      "e_write_pJ": 0.4065241836,
+      "e_read_per_bit_fJ": 1.4849184709687502,
+      "e_write_per_bit_fJ": 3.1759701843749997,
+      "leak_mW": 0.866784918,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.06506283558,
+        "t_write_ns": 0.06506283558,
+        "t_read_access_ns": 0.0459276583,
+        "t_read_addr_path_ns": 0.03111041604,
+        "t_read_ns": 0.0459276583,
+        "t_critical_ns": 0.06506283558,
+        "slack_ns": 0.1016038311
+      }
+    },
+    {
+      "depth": 8,
+      "width": 128,
+      "area_um2": 1966.60992,
+      "area_per_bit_um2": 1.9205175,
+      "e_read_pJ": 0.396740346477,
+      "e_write_pJ": 0.5951025978,
+      "e_read_per_bit_fJ": 3.0995339568515625,
+      "e_write_per_bit_fJ": 4.6492390453125,
+      "leak_mW": 1.7650388670000001,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.06912935958000001,
+        "t_write_ns": 0.06912935958000001,
+        "t_read_access_ns": 0.058215057800000004,
+        "t_read_addr_path_ns": 0.04522313029,
+        "t_read_ns": 0.058215057800000004,
+        "t_critical_ns": 0.06912935958000001,
+        "slack_ns": 0.09753730709
+      }
+    },
+    {
+      "depth": 16,
+      "width": 128,
+      "area_um2": 3921.6460800000004,
+      "area_per_bit_um2": 1.9148662500000002,
+      "e_read_pJ": 0.780924633869,
+      "e_write_pJ": 0.9610366896,
+      "e_read_per_bit_fJ": 6.100973702101562,
+      "e_write_per_bit_fJ": 7.5080991375,
+      "leak_mW": 3.52947488,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.07726240758,
+        "t_write_ns": 0.07726240758,
+        "t_read_access_ns": 0.0705024573,
+        "t_read_addr_path_ns": 0.06116115929,
+        "t_read_ns": 0.0705024573,
+        "t_critical_ns": 0.07726240758,
+        "slack_ns": 0.08940425909
+      }
+    },
+    {
+      "depth": 32,
+      "width": 128,
+      "area_um2": 7790.999040000001,
+      "area_per_bit_um2": 1.9020993750000001,
+      "e_read_pJ": 1.5224346779609998,
+      "e_write_pJ": 1.686452139,
+      "e_read_per_bit_fJ": 11.894020921570311,
+      "e_write_per_bit_fJ": 13.1754073359375,
+      "leak_mW": 7.031097829,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.0793656281,
+        "t_write_ns": 0.0793656281,
+        "t_read_access_ns": 0.08278985678999999,
+        "t_read_addr_path_ns": 0.08074981778,
+        "t_read_ns": 0.08278985678999999,
+        "t_critical_ns": 0.08278985678999999,
+        "slack_ns": 0.08387680987
+      }
+    },
+    {
+      "depth": 64,
+      "width": 128,
+      "area_um2": 15480.28416,
+      "area_per_bit_um2": 1.889683125,
+      "e_read_pJ": 2.9794888031499998,
+      "e_write_pJ": 3.132639804,
+      "e_read_per_bit_fJ": 23.277256274609375,
+      "e_write_per_bit_fJ": 24.47374846875,
+      "leak_mW": 13.9975696,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.07038242958,
+        "t_write_ns": 0.07038242958,
+        "t_read_access_ns": 0.09507725629,
+        "t_read_addr_path_ns": 0.1076397353,
+        "t_read_ns": 0.1076397353,
+        "t_critical_ns": 0.1076397353,
+        "slack_ns": 0.05902693139
+      }
+    },
+    {
+      "depth": 128,
+      "width": 128,
+      "area_um2": 30835.53792,
+      "area_per_bit_um2": 1.882051875,
+      "e_read_pJ": 5.87589785335,
+      "e_write_pJ": 6.023151503,
+      "e_read_per_bit_fJ": 45.90545197929687,
+      "e_write_per_bit_fJ": 47.0558711171875,
+      "leak_mW": 27.92954846,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.057741920579999995,
+        "t_write_ns": 0.057741920579999995,
+        "t_read_access_ns": 0.1073646558,
+        "t_read_addr_path_ns": 0.13292835449999998,
+        "t_read_ns": 0.13292835449999998,
+        "t_critical_ns": 0.13292835449999998,
+        "slack_ns": 0.03373831217
+      }
+    },
+    {
+      "depth": 256,
+      "width": 128,
+      "area_um2": 61597.578239999995,
+      "area_per_bit_um2": 1.8798089062499999,
+      "e_read_pJ": 11.66201891354,
+      "e_write_pJ": 11.855410840000001,
+      "e_read_per_bit_fJ": 91.10952276203126,
+      "e_write_per_bit_fJ": 92.6203971875,
+      "leak_mW": 55.87115324,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.05613568125,
+        "t_write_ns": 0.05613568125,
+        "t_read_access_ns": 0.1196520553,
+        "t_read_addr_path_ns": 0.1439828083,
+        "t_read_ns": 0.1439828083,
+        "t_critical_ns": 0.1439828083,
+        "slack_ns": 0.022683858390000002
+      }
+    },
+    {
+      "depth": 4,
+      "width": 256,
+      "area_um2": 1928.9318399999997,
+      "area_per_bit_um2": 1.8837224999999997,
+      "e_read_pJ": 0.380139128584,
+      "e_write_pJ": 0.8083860261000001,
+      "e_read_per_bit_fJ": 1.48491847103125,
+      "e_write_per_bit_fJ": 3.1577579144531254,
+      "leak_mW": 1.731037846,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.11681859559999999,
+        "t_write_ns": 0.11681859559999999,
+        "t_read_access_ns": 0.0459276583,
+        "t_read_addr_path_ns": 0.03111041604,
+        "t_read_ns": 0.0459276583,
+        "t_critical_ns": 0.11681859559999999,
+        "slack_ns": 0.04984807109
+      }
+    },
+    {
+      "depth": 8,
+      "width": 256,
+      "area_um2": 3924.5184,
+      "area_per_bit_um2": 1.91626875,
+      "e_read_pJ": 0.793480692977,
+      "e_write_pJ": 1.1828951460000001,
+      "e_read_per_bit_fJ": 3.099533956941406,
+      "e_write_per_bit_fJ": 4.6206841640625,
+      "leak_mW": 3.525375459,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.0919348841,
+        "t_write_ns": 0.0919348841,
+        "t_read_access_ns": 0.058215057800000004,
+        "t_read_addr_path_ns": 0.04522313029,
+        "t_read_ns": 0.058215057800000004,
+        "t_critical_ns": 0.0919348841,
+        "slack_ns": 0.07473178256
+      }
+    },
+    {
+      "depth": 16,
+      "width": 256,
+      "area_um2": 7826.649600000001,
+      "area_per_bit_um2": 1.9108031250000002,
+      "e_read_pJ": 1.561849267769,
+      "e_write_pJ": 1.910507003,
+      "e_read_per_bit_fJ": 6.100973702222656,
+      "e_write_per_bit_fJ": 7.46291798046875,
+      "leak_mW": 7.050148064,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.07862831058,
+        "t_write_ns": 0.07862831058,
+        "t_read_access_ns": 0.0705024573,
+        "t_read_addr_path_ns": 0.06116115929,
+        "t_read_ns": 0.0705024573,
+        "t_critical_ns": 0.07862831058,
+        "slack_ns": 0.08803835608999999
+      }
+    },
+    {
+      "depth": 32,
+      "width": 256,
+      "area_um2": 15547.02336,
+      "area_per_bit_um2": 1.89783,
+      "e_read_pJ": 3.044869355961,
+      "e_write_pJ": 3.3542411139999997,
+      "e_read_per_bit_fJ": 11.894020921722657,
+      "e_write_per_bit_fJ": 13.102504351562498,
+      "leak_mW": 14.04169862,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.0703379621,
+        "t_write_ns": 0.0703379621,
+        "t_read_access_ns": 0.08278985678999999,
+        "t_read_addr_path_ns": 0.08074981778,
+        "t_read_ns": 0.08278985678999999,
+        "t_critical_ns": 0.08278985678999999,
+        "slack_ns": 0.08387680987
+      }
+    },
+    {
+      "depth": 64,
+      "width": 256,
+      "area_um2": 30894.92736,
+      "area_per_bit_um2": 1.88567671875,
+      "e_read_pJ": 5.9589776071500005,
+      "e_write_pJ": 6.233488386,
+      "e_read_per_bit_fJ": 23.277256277929688,
+      "e_write_per_bit_fJ": 24.3495640078125,
+      "leak_mW": 27.95691827,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.07089613158,
+        "t_write_ns": 0.07089613158,
+        "t_read_access_ns": 0.09507725629,
+        "t_read_addr_path_ns": 0.1076397353,
+        "t_read_ns": 0.1076397353,
+        "t_critical_ns": 0.1076397353,
+        "slack_ns": 0.05902693139
+      }
+    },
+    {
+      "depth": 128,
+      "width": 256,
+      "area_um2": 61556.689920000004,
+      "area_per_bit_um2": 1.8785610937500001,
+      "e_read_pJ": 11.75179570435,
+      "e_write_pJ": 11.9904949,
+      "e_read_per_bit_fJ": 45.90545197011719,
+      "e_write_per_bit_fJ": 46.837870703125,
+      "leak_mW": 55.801946140000005,
+      "timing": {
+        "t_write_data_setup_ns": 0.01396698206,
+        "t_write_clock_path_ns": 0.05914940358,
+        "t_write_ns": 0.05914940358,
+        "t_read_access_ns": 0.1073646558,
+        "t_read_addr_path_ns": 0.13292835449999998,
+        "t_read_ns": 0.13292835449999998,
+        "t_critical_ns": 0.13292835449999998,
+        "slack_ns": 0.03373831217
+      }
+    }
+  ],
+  "failures": [
+    {
+      "depth": 512,
+      "width": 32,
+      "error": "timing not met at target frequency 6e+09 Hz -- t_critical=1.63404e-10 s, slack=3.26256e-12 s; energy fields are null for this row"
+    },
+    {
+      "depth": 512,
+      "width": 64,
+      "error": "timing not met at target frequency 6e+09 Hz -- t_critical=1.63867e-10 s, slack=2.79969e-12 s; energy fields are null for this row"
+    },
+    {
+      "depth": 512,
+      "width": 128,
+      "error": "timing not met at target frequency 6e+09 Hz -- t_critical=1.65677e-10 s, slack=9.89704e-13 s; energy fields are null for this row"
+    },
+    {
+      "depth": 256,
+      "width": 256,
+      "error": "timing not met at target frequency 6e+09 Hz -- t_critical=1.65963e-10 s, slack=7.0324e-13 s; energy fields are null for this row"
+    },
+    {
+      "depth": 512,
+      "width": 256,
+      "error": "timing not met at target frequency 6e+09 Hz -- t_critical=1.63553e-10 s, slack=3.11355e-12 s; energy fields are null for this row"
+    }
+  ],
+  "sanity_checks": {
+    "area_linear_in_bits": {
+      "pass": true,
+      "per_width_R2": {
+        "32": 0.9999966049424412,
+        "64": 0.9999969659044947,
+        "128": 0.9999978891336047,
+        "256": 0.9999924504798227
+      }
+    },
+    "e_write_linear_in_depth": {
+      "pass": true,
+      "per_width_slope_pJ_per_entry": {
+        "32": 0.011584738998917323,
+        "64": 0.022794818454150826,
+        "128": 0.045387962130602325,
+        "256": 0.09010008961604478
+      }
+    },
+    "e_read_linear_in_depth": {
+      "pass": true,
+      "per_width_slope_pJ_per_entry": {
+        "32": 0.01135774002015224,
+        "64": 0.02271548003766514,
+        "128": 0.04543096007805907,
+        "256": 0.0914420338452724
+      },
+      "per_width_R2": {
+        "32": 0.9999688911009501,
+        "64": 0.9999688911003987,
+        "128": 0.9999688911008857,
+        "256": 0.9999139598558664
+      }
+    },
+    "leak_linear_in_bits": {
+      "pass": true,
+      "R2": 0.9999964956885908
+    },
+    "all_32_points_present": false
+  },
+  "sweep_valid": false,
+  "e_read_is_bracketed": false,
+  "note": "Read energy was previously bracketed (lower: FlitIn held static on ReadBuffer / the fix; upper: FlitIn random, pre-fix behavior) to bound a TransitionInfo modeling limitation (it cannot express 'each mux input holds a different static value, and only the selected one changes'). The two bounds were measured and found degenerate (max divergence 1.6351%), confirming the dominant read-energy term is select-driven mux tree switching, not FlitIn data activity. The bracket has been dropped; e_read_pJ below is from the single fixed (corrected) binary."
+}

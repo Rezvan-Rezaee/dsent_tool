@@ -665,6 +665,9 @@ namespace DSENT
 
     void ElectricalModel::addElectricalSubResults(const ElectricalModel* model_, double number_models_)
     {
+        // DSENT-ASSUMPTION: area is the plain sum of cell footprints below.
+        // No placement, routing, congestion, utilization factor, or
+        // whitespace is modeled; no wire-limited area bound is applied anywhere.
         // Add active area sub result
         getAreaResult("Active")->addSubResult(model_->getAreaResult("Active"), model_->getInstanceName(), number_models_);
 
